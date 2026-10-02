@@ -51,7 +51,7 @@ function Get-TargetRelease {
     param([switch]$IncludePrerelease)
 
     $headers = @{ 'Accept' = 'application/vnd.github+json'; 'User-Agent' = 'ND-Super-Nodes-Updater' }
-    $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/HenkDz/nd-super-nodes/releases' -Headers $headers
+    $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/Afrody9387/nd-super-nodes/releases' -Headers $headers
     if (-not $releases) {
         throw "No releases found on GitHub."
     }
@@ -107,7 +107,7 @@ $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nd-super-nodes-unpack-"
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 Expand-Archive -Path $tempFile -DestinationPath $tempDir -Force
 
-$preserve = @('backups', 'update.ps1', 'update.sh')
+$preserve = @('backups', '.git', '.github', 'update.ps1', 'update.sh')
 Get-ChildItem -Path $rootDir -Force | Where-Object { $_.Name -notin $preserve } | ForEach-Object {
     if ($_.PSIsContainer) {
         Remove-Item -Path $_.FullName -Recurse -Force

@@ -76,7 +76,7 @@ PY
 
 log "Current version: $LOCAL_VERSION"
 
-RELEASE_JSON=$(curl -fsSL https://api.github.com/repos/HenkDz/nd-super-nodes/releases)
+RELEASE_JSON=$(curl -fsSL https://api.github.com/repos/Afrody9387/nd-super-nodes/releases)
 
 RELEASE_INFO=$(INCLUDE_PRERELEASE=$INCLUDE_PRERELEASE python3 <<'PY'
 import json, os, sys
@@ -175,7 +175,7 @@ shopt -s dotglob nullglob
 for item in "$ROOT_DIR"/*; do
   name="$(basename "$item")"
   case "$name" in
-    backups|update.sh|update.ps1)
+    backups|.git|.github|update.sh|update.ps1)
       continue
       ;;
   esac
@@ -190,7 +190,7 @@ shopt -s dotglob nullglob
 for item in "$ROOT_DIR"/*; do
   name="$(basename "$item")"
   case "$name" in
-    backups|update.sh|update.ps1)
+    backups|.git|.github|update.sh|update.ps1)
       continue
       ;;
   esac

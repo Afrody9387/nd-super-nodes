@@ -26,7 +26,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 VERSION_FILE = os.path.join(ROOT_DIR, "version.json")
 CACHE_FILENAME = "nd_super_nodes_update_cache.json"
 CHECK_INTERVAL_SECONDS = 24 * 60 * 60  # once per day per session
-GITHUB_RELEASE_URL = "https://api.github.com/repos/HenkDz/nd-super-nodes/releases/latest"
+GITHUB_RELEASE_URL = "https://api.github.com/repos/Afrody9387/nd-super-nodes/releases/latest"
 USER_AGENT = "ND-Super-Nodes-Updater"
 
 _cache_data: Optional[Dict[str, Any]] = None

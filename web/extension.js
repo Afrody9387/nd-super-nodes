@@ -1627,7 +1627,7 @@ class UpdateService {
     return this.checkingPromise;
   }
   openReleasePage() {
-    const url = this.status?.releaseUrl || "https://github.com/HenkDz/nd-super-nodes/releases/latest";
+    const url = this.status?.releaseUrl || "https://github.com/Afrody9387/nd-super-nodes/releases/latest";
     try {
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
@@ -3308,10 +3308,11 @@ const _SuperLoraNode = class _SuperLoraNode {
       try {
         this.widgets = (this.widgets || []).filter((w) => {
           const nm = w?.name || "";
-          return !(nm === "lora_bundle" || nm.startsWith("lora_"));
+          return !(nm.startsWith("lora_") && nm !== "lora_bundle");
         });
       } catch {
       }
+      _SuperLoraNode.syncExecutionWidgets(this);
     };
     const originalOnDrawForeground = nodeType.prototype.onDrawForeground;
     nodeType.prototype.onDrawForeground = function(ctx) {
@@ -3355,27 +3356,18 @@ const _SuperLoraNode = class _SuperLoraNode {
       }
       return void 0;
     };
+    const originalOnSerialize = nodeType.prototype.onSerialize;
+    nodeType.prototype.onSerialize = function(data) {
+      if (originalOnSerialize) {
+        originalOnSerialize.call(this, data);
+      }
+      _SuperLoraNode.syncExecutionWidgets(this);
+      data.customWidgets = _SuperLoraNode.serializeCustomWidgets(this);
+    };
     const originalSerialize = nodeType.prototype.serialize;
     nodeType.prototype.serialize = function() {
+      _SuperLoraNode.syncExecutionWidgets(this);
       const data = originalSerialize.apply(this, arguments);
-      try {
-        const freshBundle = _SuperLoraNode.buildBundle(this);
-        let bridge = (this.widgets || []).find((w) => w?.name === "lora_bundle");
-        if (!bridge) {
-          bridge = this.addWidget("text", "lora_bundle", freshBundle, () => {
-          }, {});
-        }
-        bridge.type = "text";
-        bridge.hidden = true;
-        bridge.draw = () => {
-        };
-        bridge.computeSize = () => [0, 0];
-        bridge.value = freshBundle;
-        bridge.serializeValue = () => freshBundle;
-        data.inputs = data.inputs || {};
-        data.inputs.lora_bundle = freshBundle;
-      } catch {
-      }
       data.customWidgets = _SuperLoraNode.serializeCustomWidgets(this);
       return data;
     };
@@ -4053,6 +4045,24 @@ const _SuperLoraNode = class _SuperLoraNode {
    * (THE BRIDGE) Syncs data from custom lora widgets to invisible execution widgets.
    */
   static syncExecutionWidgets(node) {
+    let bridge = (node.widgets || []).find((w) => w?.name === "lora_bundle");
+    if (!bridge) {
+      bridge = node.addWidget("text", "lora_bundle", this.buildBundle(node), () => {
+      }, {
+        serialize: true,
+        hidden: true,
+        canvasOnly: true
+      });
+    }
+    bridge.options = { ...bridge.options, serialize: true, hidden: true, canvasOnly: true };
+    bridge.hidden = true;
+    bridge.draw = () => {
+    };
+    bridge.computeSize = () => [0, 0];
+    bridge.computeLayoutSize = () => ({ minHeight: 0, maxHeight: 0, minWidth: 0 });
+    bridge.value = this.buildBundle(node);
+    bridge.serializeValue = () => _SuperLoraNode.buildBundle(node);
+    node.serialize_widgets = true;
     node.setDirtyCanvas(true, true);
   }
   // Build the JSON bundle the backend expects from current custom widgets

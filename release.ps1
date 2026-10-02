@@ -26,7 +26,10 @@ $copyTargets = @(
     @{ Path = 'web'; Recurse = $true; Required = $true },
     @{ Path = 'templates'; Recurse = $true; Required = $false },
     @{ Path = 'update.ps1'; Recurse = $false; Required = $true },
-    @{ Path = 'update.sh'; Recurse = $false; Required = $true }
+    @{ Path = 'update.sh'; Recurse = $false; Required = $true },
+    @{ Path = 'LICENSE'; Recurse = $false; Required = $true },
+    @{ Path = 'requirements.txt'; Recurse = $false; Required = $true },
+    @{ Path = 'pyproject.toml'; Recurse = $false; Required = $true }
 )
 
 foreach ($target in $copyTargets) {

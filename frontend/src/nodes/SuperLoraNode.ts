@@ -123,13 +123,14 @@ export class SuperLoraNode {
       }
       
       SuperLoraNode.setupAdvancedNode(this);
-      // Purge any legacy execution widgets (ensure nothing visible remains)
+      // Keep the execution bridge; remove obsolete individual LoRA widgets.
       try {
         this.widgets = (this.widgets || []).filter((w: any) => {
           const nm = w?.name || "";
-          return !(nm === 'lora_bundle' || nm.startsWith('lora_'));
+          return !(nm.startsWith('lora_') && nm !== 'lora_bundle');
         });
       } catch {}
+      SuperLoraNode.syncExecutionWidgets(this);
     };
 
     // Override drawing and interaction
@@ -182,36 +183,23 @@ export class SuperLoraNode {
       return undefined;
     };
 
-    // Override serialization to include custom widget data
+    // New frontends serialize stored node state without calling node.serialize().
+    // onSerialize runs for both paths and preserves the custom LoRA list.
+    const originalOnSerialize = nodeType.prototype.onSerialize;
+    nodeType.prototype.onSerialize = function(data: any) {
+      if (originalOnSerialize) {
+        originalOnSerialize.call(this, data);
+      }
+      SuperLoraNode.syncExecutionWidgets(this);
+      data.customWidgets = SuperLoraNode.serializeCustomWidgets(this);
+    };
+
     const originalSerialize = nodeType.prototype.serialize;
     nodeType.prototype.serialize = function() {
-      // Start with the default serialization (ensures normal ComfyUI behavior)
+      SuperLoraNode.syncExecutionWidgets(this);
       const data = originalSerialize.apply(this, arguments);
-
-      // Always inject the backend optional input 'lora_bundle' with a fresh JSON bundle.
-      try {
-        // If a bridge widget exists, update it with a fresh bundle and serialize its value.
-        const freshBundle = SuperLoraNode.buildBundle(this);
-        let bridge = (this.widgets || []).find((w: any) => w?.name === 'lora_bundle');
-        if (!bridge) {
-          // Create once (real widget so ComfyUI serializes it reliably)
-          bridge = this.addWidget('text', 'lora_bundle', freshBundle, () => {}, {});
-        }
-        // Make it effectively invisible and non-interactive while still serializable
-        bridge.type = 'text';
-        bridge.hidden = true;
-        bridge.draw = () => {};
-        bridge.computeSize = () => [0, 0];
-        bridge.value = freshBundle;
-        bridge.serializeValue = () => freshBundle;
-
-        data.inputs = data.inputs || {};
-        data.inputs.lora_bundle = freshBundle;
-      } catch {}
-
-      // Also save our custom UI widget structures for workflow persistence
+      // Retain compatibility with older/custom serializers that omit onSerialize.
       data.customWidgets = SuperLoraNode.serializeCustomWidgets(this);
-
       return data;
     };
 
@@ -1020,8 +1008,23 @@ export class SuperLoraNode {
    * (THE BRIDGE) Syncs data from custom lora widgets to invisible execution widgets.
    */
   static syncExecutionWidgets(node: any): void {
-    // Do not create any visible/hidden widgets for backend comms. We inject during serialize.
-    // Still mark canvas dirty to refresh visuals as needed.
+    let bridge = (node.widgets || []).find((w: any) => w?.name === 'lora_bundle');
+    if (!bridge) {
+      bridge = node.addWidget('text', 'lora_bundle', this.buildBundle(node), () => {}, {
+        serialize: true,
+        hidden: true,
+        canvasOnly: true,
+      });
+    }
+    bridge.options = { ...bridge.options, serialize: true, hidden: true, canvasOnly: true };
+    bridge.hidden = true;
+    bridge.draw = () => {};
+    bridge.computeSize = () => [0, 0];
+    bridge.computeLayoutSize = () => ({ minHeight: 0, maxHeight: 0, minWidth: 0 });
+    bridge.value = this.buildBundle(node);
+    // Read live custom widgets so a queued prompt never uses stale strengths.
+    bridge.serializeValue = () => SuperLoraNode.buildBundle(node);
+    node.serialize_widgets = true;
     node.setDirtyCanvas(true, true);
   }
 

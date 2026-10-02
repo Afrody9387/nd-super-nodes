@@ -89,7 +89,7 @@ export class UpdateService {
   }
 
   openReleasePage(): void {
-    const url = this.status?.releaseUrl || 'https://github.com/HenkDz/nd-super-nodes/releases/latest';
+    const url = this.status?.releaseUrl || 'https://github.com/Afrody9387/nd-super-nodes/releases/latest';
     try {
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {

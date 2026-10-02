@@ -1,18 +1,17 @@
 [project]
 name = "nd-super-nodes"
 description = "Super LoRA Loader and ND Super Selector overlays for ComfyUI."
-version = "1.8.0"
+version = "1.8.1"
 license = {file = "LICENSE"}
 dependencies = [
 	"aiohttp>=3.8.0"
 ]
 
 [project.urls]
-Repository = "https://github.com/HenkDz/nd-super-nodes"
+Repository = "https://github.com/Afrody9387/nd-super-nodes"
 #  Used by Comfy Registry https://registry.comfy.org
 
 [tool.comfy]
-PublisherId = "nour"
-DisplayName = "nd-super-nodes"
-Icon = "https://raw.githubusercontent.com/HenkDz/nd-super-nodes/refs/heads/main/icon.png"
+DisplayName = "ND Super Nodes (Afrody fork)"
+Icon = "https://raw.githubusercontent.com/Afrody9387/nd-super-nodes/refs/heads/main/icon.png"
 includes = []
