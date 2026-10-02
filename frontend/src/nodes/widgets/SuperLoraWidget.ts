@@ -454,7 +454,7 @@ export class SuperLoraWidget extends SuperLoraBaseWidget {
         canvas.prompt("Model Strength", this.value.strength ?? 1, (v: any) => {
           const val = parseFloat(v);
           if (!Number.isNaN(val)) {
-            this.value.strength = Math.max(-10, Math.min(10, val));
+            this.value.strength = Math.max(-20, Math.min(20, val));
             node.setDirtyCanvas(true, true);
           }
         }, event);
@@ -465,14 +465,14 @@ export class SuperLoraWidget extends SuperLoraBaseWidget {
   };
 
   onStrengthDownClick = (_event: any, _pos: any, node: any): boolean => {
-    this.value.strength = Math.max(-10, this.value.strength - 0.1);
+    this.value.strength = Math.max(-20, this.value.strength - 0.1);
     node.setDirtyCanvas(true, false);
     try { WidgetAPI.syncExecutionWidgets(node); } catch {}
     return true;
   };
 
   onStrengthUpClick = (_event: any, _pos: any, node: any): boolean => {
-    this.value.strength = Math.min(10, this.value.strength + 0.1);
+    this.value.strength = Math.min(20, this.value.strength + 0.1);
     node.setDirtyCanvas(true, false);
     try { WidgetAPI.syncExecutionWidgets(node); } catch {}
     return true;
@@ -486,7 +486,7 @@ export class SuperLoraWidget extends SuperLoraBaseWidget {
         canvas.prompt("CLIP Strength", this.value.strengthClip ?? this.value.strength ?? 1, (v: any) => {
           const val = parseFloat(v);
           if (!Number.isNaN(val)) {
-            this.value.strengthClip = Math.max(-10, Math.min(10, val));
+            this.value.strengthClip = Math.max(-20, Math.min(20, val));
             node.setDirtyCanvas(true, true);
             try { WidgetAPI.syncExecutionWidgets(node); } catch {}
           }
@@ -498,14 +498,14 @@ export class SuperLoraWidget extends SuperLoraBaseWidget {
   };
 
   onStrengthClipDownClick = (_event: any, _pos: any, node: any): boolean => {
-    this.value.strengthClip = Math.max(-10, (this.value.strengthClip ?? this.value.strength ?? 1) - 0.1);
+    this.value.strengthClip = Math.max(-20, (this.value.strengthClip ?? this.value.strength ?? 1) - 0.1);
     node.setDirtyCanvas(true, false);
     try { WidgetAPI.syncExecutionWidgets(node); } catch {}
     return true;
   };
 
   onStrengthClipUpClick = (_event: any, _pos: any, node: any): boolean => {
-    this.value.strengthClip = Math.min(10, (this.value.strengthClip ?? this.value.strength ?? 1) + 0.1);
+    this.value.strengthClip = Math.min(20, (this.value.strengthClip ?? this.value.strength ?? 1) + 0.1);
     node.setDirtyCanvas(true, false);
     try { WidgetAPI.syncExecutionWidgets(node); } catch {}
     return true;
