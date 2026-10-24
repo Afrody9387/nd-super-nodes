@@ -1,17 +1,14 @@
-# ND Super Nodes 1.9.0 — Nodes 2.0 support
+# ND Super Nodes 1.10.0 — Compact, resizable LoRA list
 
-ND Super LoRA Loader now uses ComfyUI's registered DOM widget API instead of drawing its controls only through Canvas callbacks. The LoRA list and controls display in both modern Nodes 2.0 and classic Canvas mode.
+- Each LoRA uses one compact line: enabled switch, file name, inline model/CLIP strength, one drag handle, remove, and a rightmost details triangle.
+- Trigger words and the per-row tag button are collapsed into the details line by default. The tag button remains accessible even when trigger words are hidden in settings. Expanding a row never changes its LoRA data. Expansion state survives workflow saves.
+- The standard node setting controls whether there is one strength field or separate Model/CLIP fields. Existing strength preferences and the -20 to +20 range remain intact.
+- One drag handle replaces the two arrow buttons. Drag to an insertion marker and release to reorder. Holding at the list edge scrolls automatically. Dropping into another tag group adopts that group. The focused handle also supports keyboard Up/Down.
+- Both classic and Nodes 2.0 use a bounded list with a visible scrollbar. Resize the node to show more rows; editing or adding LoRAs no longer resets the node height. Wheel scrolling stays in the list instead of changing weights or zooming the graph.
 
-- Native controls for adding/choosing/removing LoRAs, enabling rows, ordering, model/CLIP strengths, trigger words and refresh.
-- Tag groups support collapse/expand; regrouping preserves collapsed state.
-- Existing template save/load and settings menus remain connected to the same data and services.
-- Long lists scroll inside a bounded panel. Inputs retain focus while editing and do not drag the graph.
-- The DOM panel is excluded from execution parameters and saved widget values; existing workflows, templates and the live `lora_bundle` bridge remain compatible.
-- Preserves the -20 to +20 strength range and the previous frontend 1.53 serialization repair.
-- Loads the generated CSS explicitly and follows ComfyUI theme variables.
+Validation: TypeScript and Vite build; actual frontend serialization regression; headless Edge running the unmodified frontend 1.55.18 with isolated backend fixtures. Tests exercise both renderer modes, a 30-row scrolling list, actual resize-grip dragging and increased viewport height, edit-preserved height, wheel scrolling without graph zoom, compact row height, collapsed trigger editing, pointer drag/drop with edge auto-scroll, strengths, toggles, tags, add/remove, workflow reload and generated execution parameters. No GPU generation was submitted.
 
-Validation: TypeScript checking and Vite build; existing LoRA path unit test; serialization regression against the installed frontend; headless Edge running the real, unmodified ComfyUI frontend 1.55.18 with isolated backend fixtures. Browser checks cover actual Nodes 2.0/classic modes, editing and focus, independent strengths, enable switches, ordering, tag collapse, file picker add/remove, workflow reload and generated execution requests. No actual GPU generation or every third-party extension combination has been tested.
+Update this fork with Git or install `nd-super-nodes-v1.10.0.zip` into a single `ComfyUI/custom_nodes/nd-super-nodes` directory. Restart ComfyUI and hard refresh the browser. Existing workflows and templates remain supported.
 
-Install `nd-super-nodes-v1.9.0.zip` into a single `ComfyUI/custom_nodes/nd-super-nodes` directory, or update this fork with Git. Save any unsaved edits first, then restart ComfyUI and hard refresh the browser. Both renderer modes now use the same native-control layout.
-
-Updates use https://github.com/Afrody9387/nd-super-nodes . Upstream is https://github.com/HenkDz/nd-super-nodes ; the original MIT license and attribution are retained.
+Fork: https://github.com/Afrody9387/nd-super-nodes
+Upstream: https://github.com/HenkDz/nd-super-nodes — original MIT license and attribution retained.

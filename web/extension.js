@@ -3256,9 +3256,10 @@ class SuperLoraPanel {
     this.list = element("div", "nd-lora-list");
     this.rowViews = /* @__PURE__ */ new WeakMap();
     this.tagViews = /* @__PURE__ */ new WeakMap();
+    this.rowsByElement = /* @__PURE__ */ new WeakMap();
     this.empty = element("div", "nd-lora-empty");
     this.disposed = false;
-    this.height = 160;
+    this.minimumHeight = 140;
     const toolbar = element("div", "nd-lora-toolbar");
     toolbar.append(button("+ Add LoRA", "Add LoRA", () => actions.add()));
     this.allButton = button("Disable all", "Toggle all LoRAs", () => {
@@ -3277,27 +3278,37 @@ class SuperLoraPanel {
     );
     this.empty.textContent = "No LoRAs yet. Use Add LoRA to choose a file.";
     this.list.setAttribute("aria-label", "LoRA list");
+    this.list.dataset.captureWheel = "true";
+    this.list.tabIndex = 0;
+    this.list.addEventListener("pointerenter", () => {
+      const active = document.activeElement;
+      if (!this.list.contains(active) && !(active instanceof HTMLElement && active.matches('input,textarea,[contenteditable="true"]'))) {
+        this.list.focus({ preventScroll: true });
+      }
+    });
     this.element.append(toolbar, this.list);
     for (const name of ["pointerdown", "mousedown", "dblclick", "keydown", "keyup"]) {
       this.element.addEventListener(name, (event) => event.stopPropagation());
     }
     this.list.addEventListener("wheel", (event) => {
-      if (!event.ctrlKey && !event.metaKey) event.stopPropagation();
-    });
+      if (event.ctrlKey || event.metaKey) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.list.clientHeight : 1;
+      this.list.scrollTop += event.deltaY * unit;
+    }, { capture: true, passive: false });
     this.widget = node.addDOMWidget("nd_super_lora_panel", "nd-super-lora-panel", this.element, {
       serialize: false,
       hideOnZoom: false,
       margin: 4,
-      getMinHeight: () => this.height,
-      getMaxHeight: () => this.height,
-      getHeight: () => this.height
+      getMinHeight: () => this.minimumHeight
     });
     this.widget.serialize = false;
-    this.widget.computeSize = () => [280, this.height];
-    this.widget.computeLayoutSize = () => ({ minHeight: this.height, maxHeight: this.height, minWidth: 280 });
+    this.widget.computeLayoutSize = () => ({ minHeight: this.minimumHeight, minWidth: 360 });
     const onRemove = this.widget.onRemove;
     this.widget.onRemove = () => {
       this.disposed = true;
+      this.cancelDrag?.();
       panels.delete(node);
       onRemove?.call(this.widget);
     };
@@ -3337,9 +3348,6 @@ class SuperLoraPanel {
     this.allButton.textContent = rows.length && rows.every((row) => row.value.enabled) ? "Disable all" : "Enable all";
     this.allButton.disabled = rows.length === 0;
     reconcile(this.list, children.length ? children : rows.length ? [] : [this.empty]);
-    const visibleRows = children.filter((child) => child.classList.contains("nd-lora-row")).length;
-    this.height = Math.min(600, Math.max(160, 82 + visibleRows * (properties.showTriggerWords === false ? 88 : 120) + (children.length - visibleRows) * 30));
-    this.element.style.height = `${this.height}px`;
   }
   createRow(row) {
     const root = element("section", "nd-lora-row");
@@ -3350,15 +3358,23 @@ class SuperLoraPanel {
     enabled.addEventListener("change", () => this.actions.change(row, { enabled: enabled.checked }));
     const choose = button("", "Choose LoRA file", (event) => this.actions.choose(row, event));
     choose.className = "nd-lora-name";
-    const up = button("↑", "Move LoRA up", () => this.actions.move(row, -1));
-    const down = button("↓", "Move LoRA down", () => this.actions.move(row, 1));
+    const drag = button("⠿", "Drag to reorder LoRA", () => {
+    });
+    drag.className = "nd-lora-drag";
+    drag.addEventListener("pointerdown", (event) => this.startDrag(event, row, root, drag));
+    drag.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault();
+        this.actions.move(row, event.key === "ArrowUp" ? -1 : 1);
+      }
+    });
     const remove = button("×", "Remove LoRA", () => this.actions.remove(row));
-    top.append(enabled, choose, up, down, remove);
     const controls = element("div", "nd-lora-controls");
     const strength = (name, key) => {
       const label = element("label", "nd-lora-strength");
       const text = element("span");
-      text.textContent = name;
+      text.textContent = name === "Model" ? "M" : "C";
+      text.title = `${name} strength`;
       const input = element("input");
       input.type = "number";
       input.min = "-20";
@@ -3382,7 +3398,7 @@ class SuperLoraPanel {
     const clip = strength("CLIP", "strengthClip");
     const tag = button("", "Choose LoRA tag", () => this.actions.tag(row));
     tag.className = "nd-lora-tag";
-    controls.append(model.label, clip.label, tag);
+    controls.append(model.label, clip.label);
     const triggers = element("div", "nd-lora-triggers");
     const words = element("input");
     words.type = "text";
@@ -3398,8 +3414,15 @@ class SuperLoraPanel {
         this.update();
       }
     });
-    triggers.append(words, refresh);
-    root.append(top, controls, triggers);
+    triggers.append(words, refresh, tag);
+    const expand = button("▸", "Toggle LoRA details", () => {
+      row.value._triggerWordsExpanded = !row.value._triggerWordsExpanded;
+      this.actions.changed();
+    });
+    expand.className = "nd-lora-expand";
+    top.append(enabled, choose, controls, drag, remove, expand);
+    root.append(top, triggers);
+    this.rowsByElement.set(root, row);
     return { root, update: (properties) => {
       const value = row.value;
       enabled.checked = !!value.enabled;
@@ -3408,15 +3431,88 @@ class SuperLoraPanel {
       choose.title = String(value.lora);
       tag.textContent = value.tag || "General";
       tag.hidden = !properties.enableTags || properties.showTagChip === false;
-      up.hidden = down.hidden = properties.showMoveArrows === false;
+      drag.hidden = properties.showMoveArrows === false;
       remove.hidden = properties.showRemoveButton === false;
       controls.hidden = properties.showStrengthControls === false;
       clip.label.hidden = !properties.showSeparateStrengths;
-      triggers.hidden = properties.showTriggerWords === false;
+      const expanded = !!value._triggerWordsExpanded;
+      const hasDetails = properties.showTriggerWords !== false || !tag.hidden;
+      triggers.hidden = !expanded || !hasDetails;
+      words.hidden = refresh.hidden = properties.showTriggerWords === false;
+      expand.hidden = !hasDetails;
+      expand.textContent = expanded ? "▾" : "▸";
+      expand.setAttribute("aria-expanded", String(expanded));
       for (const [input, next] of [[model.input, value.strength ?? 1], [clip.input, value.strengthClip ?? value.strength ?? 1], [words, value.triggerWords || ""]]) {
         if (document.activeElement !== input) input.value = String(next);
       }
     } };
+  }
+  startDrag(event, row, root, handle) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    handle.focus({ preventScroll: true });
+    this.cancelDrag?.();
+    handle.setPointerCapture(event.pointerId);
+    root.classList.add("nd-lora-dragging");
+    let marker;
+    let target;
+    let after = false;
+    let pointerY = event.clientY;
+    let frame = 0;
+    const mark = (x, y) => {
+      marker?.classList.remove("nd-lora-drop-before", "nd-lora-drop-after");
+      marker = void 0;
+      target = void 0;
+      const candidate = document.elementFromPoint(x, y)?.closest(".nd-lora-row");
+      if (!candidate || candidate === root || !this.list.contains(candidate)) return;
+      target = this.rowsByElement.get(candidate);
+      if (!target) return;
+      marker = candidate;
+      const rect = candidate.getBoundingClientRect();
+      after = y > rect.top + rect.height / 2;
+      candidate.classList.add(after ? "nd-lora-drop-after" : "nd-lora-drop-before");
+    };
+    let pointerX = event.clientX;
+    const scroll = () => {
+      const rect = this.list.getBoundingClientRect();
+      const delta = pointerY < rect.top + 30 ? -8 : pointerY > rect.bottom - 30 ? 8 : 0;
+      if (delta) {
+        this.list.scrollTop += delta;
+        mark(pointerX, pointerY);
+      }
+      frame = requestAnimationFrame(scroll);
+    };
+    const move = (e) => {
+      if (e.pointerId !== event.pointerId) return;
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+      mark(pointerX, pointerY);
+    };
+    const cleanup = () => {
+      cancelAnimationFrame(frame);
+      marker?.classList.remove("nd-lora-drop-before", "nd-lora-drop-after");
+      root.classList.remove("nd-lora-dragging");
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerup", drop, true);
+      document.removeEventListener("pointercancel", cancel, true);
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+      this.cancelDrag = void 0;
+    };
+    const drop = (e) => {
+      if (e.pointerId !== event.pointerId) return;
+      const selected = target;
+      cleanup();
+      if (selected) this.actions.reorder(row, selected, after);
+    };
+    const cancel = (e) => {
+      if (e.pointerId === event.pointerId) cleanup();
+    };
+    this.cancelDrag = cleanup;
+    document.addEventListener("pointermove", move, true);
+    document.addEventListener("pointerup", drop, true);
+    document.addEventListener("pointercancel", cancel, true);
+    frame = requestAnimationFrame(scroll);
   }
 }
 function ensureLoraPanel(node, actions) {
@@ -3652,7 +3748,7 @@ const _SuperLoraNode = class _SuperLoraNode {
   }
   static computeContentHeight(node) {
     const panel = getLoraPanel(node);
-    if (panel) return this.NODE_WIDGET_TOP_OFFSET + panel.height;
+    if (panel) return this.NODE_WIDGET_TOP_OFFSET + panel.minimumHeight;
     const marginDefault = _SuperLoraNode.MARGIN_SMALL;
     let currentY = this.NODE_WIDGET_TOP_OFFSET;
     if (!node?.customWidgets) {
@@ -3683,7 +3779,11 @@ const _SuperLoraNode = class _SuperLoraNode {
    * Calculate required node size based on widgets
    */
   static calculateNodeSize(node) {
-    getLoraPanel(node)?.update();
+    const panel = getLoraPanel(node);
+    if (panel) {
+      panel.update();
+      return;
+    }
     const newHeight = this.computeContentHeight(node);
     if (node.size[1] !== newHeight) {
       node.size[1] = newHeight;
@@ -4002,7 +4102,7 @@ const _SuperLoraNode = class _SuperLoraNode {
         }
       },
       {
-        content: `${node.properties.showMoveArrows !== false ? "✅" : "❌"} Show Move Arrows`,
+        content: `${node.properties.showMoveArrows !== false ? "✅" : "❌"} Show Drag Handle`,
         callback: () => {
           node.properties.showMoveArrows = node.properties.showMoveArrows === false ? true : false;
           node.setDirtyCanvas(true, false);
@@ -4291,6 +4391,17 @@ const _SuperLoraNode = class _SuperLoraNode {
       move: (row, direction) => {
         if (direction < 0) row.onMoveUpClick(null, null, node);
         else row.onMoveDownClick(null, null, node);
+        this.syncExecutionWidgets(node);
+      },
+      reorder: (row, target, after) => {
+        if (row === target) return;
+        const rows = node.customWidgets;
+        const from = rows.indexOf(row);
+        if (from < 0 || !rows.includes(target)) return;
+        rows.splice(from, 1);
+        rows.splice(rows.indexOf(target) + (after ? 1 : 0), 0, row);
+        if (node.properties.enableTags) row.value.tag = target.value.tag || "General";
+        this.organizeByTags(node);
         this.syncExecutionWidgets(node);
       },
       change: (row, values) => {

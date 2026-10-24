@@ -7,6 +7,9 @@ fixes missing LoRA execution parameters and workflow persistence on ComfyUI
 frontend 1.53.6. See [release notes](FORK_RELEASE_NOTES.md) for validation and limits.
 Since 1.9.0, the loader uses native DOM controls in both modern Nodes 2.0 and
 classic Canvas mode, including the LoRA list, dual strengths, tags and templates.
+Since 1.10.0, rows use one line with inline strengths and a drag handle. Trigger
+words expand individually. Both renderers keep the list scrollable and let the
+user resize the node to show more rows without edits resetting its height.
 Source and compiled runtime files are both included. Update checks and updater
 downloads use this fork's GitHub releases. The original MIT license is retained.
 

@@ -104,6 +104,10 @@ async function main() {
     await panel.getByLabel('Model strength', { exact: true }).first().fill('-2.5');
     await panel.getByLabel('CLIP strength', { exact: true }).first().fill('0.25');
     const words = panel.getByLabel('Trigger words', { exact: true }).first();
+    assert.equal(await words.isVisible(), false);
+    assert.equal(await panel.getByLabel('Choose LoRA tag', { exact: true }).first().isVisible(), false);
+    await panel.getByLabel('Toggle LoRA details', { exact: true }).first().click();
+    assert.equal(await panel.getByLabel('Choose LoRA tag', { exact: true }).first().isVisible(), true);
     await words.fill('typed trigger');
     assert.equal(await words.evaluate(el => document.activeElement === el), true);
     let bundle = await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue()));
@@ -111,7 +115,12 @@ async function main() {
     await panel.getByLabel('Enable LoRA', { exact: true }).first().uncheck();
     bundle = await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue()));
     assert.equal(bundle[0].enabled, false);
-    await panel.getByLabel('Move LoRA down', { exact: true }).first().click();
+    const handle = await panel.getByLabel('Drag to reorder LoRA', { exact: true }).first().boundingBox();
+    const targetRow = await panel.locator('.nd-lora-row').last().boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(targetRow.x + targetRow.width / 2, targetRow.y + targetRow.height - 3, { steps: 10 });
+    await page.mouse.up();
     bundle = await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue()));
     assert.equal(bundle[0].lora, 'fixture/second.safetensors');
     await panel.locator('.nd-lora-group').first().click();
@@ -145,8 +154,84 @@ async function main() {
     bundle = await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue()));
     assert.equal(bundle[0].strength, 20);
     await page.screenshot({ path: path.join(screenshots, 'classic.png') });
+
+    // A long list must stay inside the node in both renderers. Changing any
+    // LoRA value must not undo a height the user chose with the resize grip.
+    await page.evaluate(() => {
+      const node = window.qaNode;
+      for (const row of node.customWidgets) if (row.value) row.value._triggerWordsExpanded = false;
+      for (let i = 0; i < 28; i++) window.SuperLoraNode.addLoraWidget(node, { lora: `fixture/extra-${i}.safetensors`, enabled: true });
+      window.SuperLoraNode.syncExecutionWidgets(node);
+    });
+    const metrics = () => panel.locator('.nd-lora-list').evaluate(el => ({ height: el.clientHeight, scroll: el.scrollHeight, top: el.scrollTop }));
+    for (const modern of [false, true]) {
+      await page.evaluate(async modern => {
+        await window.app.ui.settings.setSettingValue('Comfy.VueNodes.Enabled', modern);
+        window.app.canvas.setDirty(true, true);
+      }, modern);
+      await page.waitForFunction(modern => window.LiteGraph.vueNodesMode === modern, modern);
+      await panel.waitFor({ state: 'visible' });
+      await page.waitForTimeout(150);
+      const small = await metrics();
+      assert(small.height > 80 && small.scroll > small.height + 100, `bounded ${modern ? 'modern' : 'classic'} list: ${JSON.stringify(small)}`);
+      const rowHeight = await panel.locator('.nd-lora-row').first().evaluate(el => el.getBoundingClientRect().height);
+      assert(rowHeight < 42, `compact single-line row is ${rowHeight}px`);
+      const grip = await page.evaluate(modern => {
+        if (modern) {
+          const host = document.querySelector('.nd-lora-panel').closest('[data-node-id]');
+          const rect = host.getBoundingClientRect();
+          return { x: rect.right - 3, y: rect.bottom - 3 };
+        }
+        const node = window.qaNode, canvas = window.app.canvas;
+        const rect = canvas.canvas.getBoundingClientRect(), ds = canvas.ds;
+        return { x: rect.left + (node.pos[0] + ds.offset[0] + node.size[0]) * ds.scale - 3,
+          y: rect.top + (node.pos[1] + ds.offset[1] + node.size[1]) * ds.scale - 3 };
+      }, modern);
+      await page.mouse.move(grip.x, grip.y);
+      await page.mouse.down();
+      await page.mouse.move(grip.x, grip.y + 170, { steps: 15 });
+      await page.mouse.up();
+      await page.waitForTimeout(150);
+      const large = await metrics();
+      assert(large.height > small.height + 100, `${modern ? 'modern' : 'classic'} resize must grow viewport: ${JSON.stringify({ small, large, grip })}`);
+      await panel.getByLabel('Model strength', { exact: true }).first().fill('1.5');
+      assert(Math.abs((await metrics()).height - large.height) < 5, 'editing must preserve resized height');
+      const list = panel.locator('.nd-lora-list');
+      await page.evaluate(() => document.activeElement?.blur());
+      await page.mouse.move(1450, 1000);
+      await list.hover();
+      const zoomBefore = await page.evaluate(() => window.app.canvas.ds.scale);
+      await page.mouse.wheel(0, 500);
+      await page.waitForTimeout(300);
+      assert((await metrics()).top > 0, `list must scroll with wheel: ${JSON.stringify({ modern, metrics: await metrics() })}`);
+      assert.equal(await page.evaluate(() => window.app.canvas.ds.scale), zoomBefore, 'list wheel must not zoom the graph');
+      await list.evaluate(el => { el.scrollTop = 0; });
+      await panel.screenshot({ path: path.join(screenshots, modern ? 'compact-modern.png' : 'compact-classic.png') });
+    }
+    const sourceName = await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue())[0].lora);
+    const sourceGrip = await panel.getByLabel('Drag to reorder LoRA', { exact: true }).first().boundingBox();
+    const listBox = await panel.locator('.nd-lora-list').boundingBox();
+    await page.mouse.move(sourceGrip.x + sourceGrip.width / 2, sourceGrip.y + sourceGrip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(listBox.x + listBox.width / 2, listBox.y + listBox.height - 8, { steps: 10 });
+    await page.waitForTimeout(250);
+    assert((await metrics()).top > 0, 'dragging near the list edge must auto-scroll');
+    await page.mouse.up();
+    assert.equal(await panel.locator('.nd-lora-dragging').count(), 0);
+    assert.notEqual(await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue())[0].lora), sourceName);
+    await panel.locator('.nd-lora-list').evaluate(el => { el.scrollTop = 0; });
+    await page.evaluate(() => { window.qaNode.properties.showSeparateStrengths = false; window.SuperLoraNode.syncExecutionWidgets(window.qaNode); });
+    assert.equal(await panel.getByLabel('CLIP strength', { exact: true }).first().isVisible(), false);
+    assert.equal(await panel.getByLabel('Trigger words', { exact: true }).first().isVisible(), false);
+    const beforeShrink = await metrics();
+    const shrinkGrip = await panel.evaluate(el => { const rect = el.closest('[data-node-id]').getBoundingClientRect(); return { x: rect.right - 3, y: rect.bottom - 3 }; });
+    await page.mouse.move(shrinkGrip.x, shrinkGrip.y); await page.mouse.down();
+    await page.mouse.move(shrinkGrip.x, shrinkGrip.y - 250, { steps: 15 }); await page.mouse.up();
+    await page.waitForTimeout(150);
+    assert((await metrics()).height < beforeShrink.height - 100, 'node must also shrink without expanding to fit all rows');
+    await panel.screenshot({ path: path.join(screenshots, 'compact-preview.png') });
     assert.equal(errors.some(error => /SuperLoraPanel|ensureLoraPanel|SuperLoraNode\.syncExecutionWidgets/.test(error)), false);
-    console.log('PASS: real Nodes 2.0 and classic renderers display the DOM panel; editing, focus, dual strengths, toggles, reorder, tag collapse, add/remove, workflow round trip and execution prompt serialization.');
+    console.log('PASS: real Nodes 2.0/classic renderers; compact rows, collapsed triggers, drag reorder, 30-row bounded scrolling, actual grip resizing, edit-preserved height, wheel without graph zoom, focus, strengths, toggles, tags, add/remove, workflow reload and execution serialization.');
     console.log('Isolated fixture console:', JSON.stringify([...new Set(errors.map(error => error.slice(0, 160)))]));
   } catch (error) {
     await page.screenshot({ path: path.join(screenshots, 'failure.png') });

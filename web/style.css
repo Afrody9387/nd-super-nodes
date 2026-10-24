@@ -7,6 +7,9 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 0;
   min-width: 0;
   padding: 6px;
   overflow: hidden;
@@ -24,7 +27,7 @@
 }
 .nd-lora-panel button, .nd-lora-panel input {
   min-width: 0;
-  min-height: 26px;
+  min-height: 24px;
   border: 1px solid var(--border-color, #555);
   border-radius: 4px;
   padding: 3px 6px;
@@ -42,7 +45,8 @@
   cursor: pointer;
 }
 .nd-lora-panel input[type=number] {
-  width: 72px;
+  width: 50px;
+  padding: 2px 3px;
 }
 .nd-lora-panel button {
   cursor: pointer;
@@ -69,16 +73,21 @@
   color: var(--p-primary-contrast-color, white);
 }
 .nd-lora-panel .nd-lora-list {
+  height: 0;
   min-height: 0;
-  overflow: auto;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color, #666) var(--comfy-menu-bg, #242424);
   overscroll-behavior: contain;
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 .nd-lora-panel .nd-lora-row {
-  padding: 6px;
+  padding: 3px;
   border: 1px solid var(--border-color, #555);
   border-radius: 5px;
   flex: 0 0 auto;
@@ -89,12 +98,24 @@
   align-items: center;
   min-width: 0;
 }
-.nd-lora-panel .nd-lora-controls, .nd-lora-panel .nd-lora-triggers {
-  margin-top: 5px;
-  flex-wrap: wrap;
+.nd-lora-panel .nd-lora-controls {
+  flex: 0 0 auto;
+  gap: 3px;
+}
+.nd-lora-panel .nd-lora-triggers {
+  margin-top: 4px;
+}
+.nd-lora-panel .nd-lora-row-top {
+  flex-wrap: nowrap;
+}
+.nd-lora-panel .nd-lora-row-top > button:not(.nd-lora-name), .nd-lora-panel .nd-lora-expand {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  min-width: 22px;
 }
 .nd-lora-panel .nd-lora-name {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 24px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -103,10 +124,10 @@
 .nd-lora-panel .nd-lora-strength {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 .nd-lora-panel .nd-lora-tag {
-  max-width: 110px;
+  max-width: 64px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -120,6 +141,22 @@
 }
 .nd-lora-panel .nd-lora-disabled .nd-lora-name {
   opacity: 0.55;
+}
+.nd-lora-panel .nd-lora-drag {
+  cursor: grab;
+  touch-action: none;
+}
+.nd-lora-panel .nd-lora-drag:active {
+  cursor: grabbing;
+}
+.nd-lora-panel .nd-lora-dragging {
+  opacity: 0.5;
+}
+.nd-lora-panel .nd-lora-drop-before {
+  box-shadow: 0 -2px 0 var(--p-primary-color, #9e77ed);
+}
+.nd-lora-panel .nd-lora-drop-after {
+  box-shadow: 0 2px 0 var(--p-primary-color, #9e77ed);
 }
 .nd-lora-panel .nd-lora-empty {
   opacity: 0.7;

@@ -309,7 +309,7 @@ export class SuperLoraNode {
 
   private static computeContentHeight(node: any): number {
     const panel = getLoraPanel(node);
-    if (panel) return this.NODE_WIDGET_TOP_OFFSET + panel.height;
+    if (panel) return this.NODE_WIDGET_TOP_OFFSET + panel.minimumHeight;
     const marginDefault = SuperLoraNode.MARGIN_SMALL;
     let currentY = this.NODE_WIDGET_TOP_OFFSET;
 
@@ -345,7 +345,11 @@ export class SuperLoraNode {
    * Calculate required node size based on widgets
    */
   static calculateNodeSize(node: any): void {
-    getLoraPanel(node)?.update();
+    const panel = getLoraPanel(node);
+    if (panel) {
+      panel.update();
+      return; // The user/renderer owns node height; edits only refresh the list.
+    }
     const newHeight = this.computeContentHeight(node);
     // Preserve the user's preferred width - only update height
     if (node.size[1] !== newHeight) {
@@ -716,7 +720,7 @@ export class SuperLoraNode {
         }
       },
       {
-        content: `${node.properties.showMoveArrows !== false ? "✅" : "❌"} Show Move Arrows`,
+        content: `${node.properties.showMoveArrows !== false ? "✅" : "❌"} Show Drag Handle`,
         callback: () => {
           node.properties.showMoveArrows = node.properties.showMoveArrows === false ? true : false;
           node.setDirtyCanvas(true, false);
@@ -1049,6 +1053,17 @@ export class SuperLoraNode {
       move: (row, direction) => {
         if (direction < 0) row.onMoveUpClick(null, null, node);
         else row.onMoveDownClick(null, null, node);
+        this.syncExecutionWidgets(node);
+      },
+      reorder: (row, target, after) => {
+        if (row === target) return;
+        const rows = node.customWidgets;
+        const from = rows.indexOf(row);
+        if (from < 0 || !rows.includes(target)) return;
+        rows.splice(from, 1);
+        rows.splice(rows.indexOf(target) + (after ? 1 : 0), 0, row);
+        if (node.properties.enableTags) row.value.tag = target.value.tag || 'General';
+        this.organizeByTags(node);
         this.syncExecutionWidgets(node);
       },
       change: (row, values) => {
