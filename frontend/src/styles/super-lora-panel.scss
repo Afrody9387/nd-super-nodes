@@ -1,0 +1,47 @@
+.nd-lora-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  overflow: hidden;
+  font: 12px 'Segoe UI', sans-serif;
+  color: var(--input-text, #ddd);
+  background: var(--comfy-menu-bg, #242424);
+  border-radius: 6px;
+  pointer-events: auto;
+  & *, & *::before, & *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  button, input {
+    min-width: 0;
+    min-height: 26px;
+    border: 1px solid var(--border-color, #555);
+    border-radius: 4px;
+    padding: 3px 6px;
+    color: inherit;
+    background: var(--comfy-input-bg, #303030);
+    font: inherit;
+  }
+  input { user-select: text; }
+  input[type='checkbox'] { min-height: 16px; flex: 0 0 16px; width: 16px; cursor: pointer; }
+  input[type='number'] { width: 72px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--p-primary-color, #9e77ed); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--p-primary-color, #9e77ed); outline-offset: 1px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .nd-lora-toolbar { display: flex; flex-wrap: wrap; gap: 4px; flex: 0 0 auto; }
+  .nd-lora-toolbar button:first-child { background: var(--p-primary-color, #7254bb); color: var(--p-primary-contrast-color, white); }
+  .nd-lora-list { min-height: 0; overflow: auto; overscroll-behavior: contain; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .nd-lora-row { padding: 6px; border: 1px solid var(--border-color, #555); border-radius: 5px; flex: 0 0 auto; }
+  .nd-lora-row-top, .nd-lora-controls, .nd-lora-triggers { display: flex; gap: 4px; align-items: center; min-width: 0; }
+  .nd-lora-controls, .nd-lora-triggers { margin-top: 5px; flex-wrap: wrap; }
+  .nd-lora-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+  .nd-lora-strength { display: inline-flex; align-items: center; gap: 4px; }
+  .nd-lora-tag { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nd-lora-triggers input { flex: 1; }
+  .nd-lora-group { flex: 0 0 auto; text-align: left; }
+  .nd-lora-disabled .nd-lora-name { opacity: .55; }
+  .nd-lora-empty { opacity: .7; padding: 14px 4px; line-height: 1.5; }
+}

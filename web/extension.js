@@ -3224,6 +3224,206 @@ class SuperLoraHeaderWidget extends SuperLoraBaseWidget {
     return [450, 35];
   }
 }
+const panels = /* @__PURE__ */ new WeakMap();
+function getLoraPanel(node) {
+  return panels.get(node);
+}
+function element(tag, className = "") {
+  const el = document.createElement(tag);
+  el.className = className;
+  return el;
+}
+function button(label, title, action) {
+  const el = element("button");
+  el.type = "button";
+  el.textContent = label;
+  el.title = title;
+  el.setAttribute("aria-label", title);
+  el.addEventListener("click", action);
+  return el;
+}
+function reconcile(parent, children) {
+  children.forEach((child, index) => {
+    if (parent.children[index] !== child) parent.insertBefore(child, parent.children[index] ?? null);
+  });
+  while (parent.children.length > children.length) parent.lastElementChild?.remove();
+}
+class SuperLoraPanel {
+  constructor(node, actions) {
+    this.node = node;
+    this.actions = actions;
+    this.element = element("div", "nd-lora-panel");
+    this.list = element("div", "nd-lora-list");
+    this.rowViews = /* @__PURE__ */ new WeakMap();
+    this.tagViews = /* @__PURE__ */ new WeakMap();
+    this.empty = element("div", "nd-lora-empty");
+    this.disposed = false;
+    this.height = 160;
+    const toolbar = element("div", "nd-lora-toolbar");
+    toolbar.append(button("+ Add LoRA", "Add LoRA", () => actions.add()));
+    this.allButton = button("Disable all", "Toggle all LoRAs", () => {
+      const rows = actions.rows();
+      const enabled = !rows.every((row) => row.value.enabled);
+      rows.forEach((row) => {
+        row.value.enabled = enabled;
+      });
+      actions.changed();
+    });
+    toolbar.append(
+      this.allButton,
+      button("Save set", "Save LoRA template", () => actions.save()),
+      button("Load set", "Load LoRA template", (event) => actions.load(event)),
+      button("Settings", "LoRA loader settings", (event) => actions.settings(event))
+    );
+    this.empty.textContent = "No LoRAs yet. Use Add LoRA to choose a file.";
+    this.list.setAttribute("aria-label", "LoRA list");
+    this.element.append(toolbar, this.list);
+    for (const name of ["pointerdown", "mousedown", "dblclick", "keydown", "keyup"]) {
+      this.element.addEventListener(name, (event) => event.stopPropagation());
+    }
+    this.list.addEventListener("wheel", (event) => {
+      if (!event.ctrlKey && !event.metaKey) event.stopPropagation();
+    });
+    this.widget = node.addDOMWidget("nd_super_lora_panel", "nd-super-lora-panel", this.element, {
+      serialize: false,
+      hideOnZoom: false,
+      margin: 4,
+      getMinHeight: () => this.height,
+      getMaxHeight: () => this.height,
+      getHeight: () => this.height
+    });
+    this.widget.serialize = false;
+    this.widget.computeSize = () => [280, this.height];
+    this.widget.computeLayoutSize = () => ({ minHeight: this.height, maxHeight: this.height, minWidth: 280 });
+    const onRemove = this.widget.onRemove;
+    this.widget.onRemove = () => {
+      this.disposed = true;
+      panels.delete(node);
+      onRemove?.call(this.widget);
+    };
+    this.update();
+  }
+  update() {
+    if (this.disposed) return;
+    const rows = this.actions.rows();
+    const properties = this.node.properties || {};
+    const children = [];
+    let collapsed = false;
+    for (const item of this.node.customWidgets || []) {
+      if (this.actions.isTag(item) && properties.enableTags) {
+        let header = this.tagViews.get(item);
+        if (!header) {
+          header = button("", "Collapse LoRA tag", () => {
+            item.value.collapsed = !item.value.collapsed;
+            this.actions.changed();
+          });
+          header.className = "nd-lora-group";
+          this.tagViews.set(item, header);
+        }
+        collapsed = !!item.value.collapsed;
+        header.textContent = `${collapsed ? "▸" : "▾"} ${item.value.tag} (${rows.filter((row) => row.value.tag === item.value.tag).length})`;
+        header.setAttribute("aria-expanded", String(!collapsed));
+        children.push(header);
+      } else if (rows.includes(item) && !collapsed) {
+        let view = this.rowViews.get(item);
+        if (!view) {
+          view = this.createRow(item);
+          this.rowViews.set(item, view);
+        }
+        view.update(properties);
+        children.push(view.root);
+      }
+    }
+    this.allButton.textContent = rows.length && rows.every((row) => row.value.enabled) ? "Disable all" : "Enable all";
+    this.allButton.disabled = rows.length === 0;
+    reconcile(this.list, children.length ? children : rows.length ? [] : [this.empty]);
+    const visibleRows = children.filter((child) => child.classList.contains("nd-lora-row")).length;
+    this.height = Math.min(600, Math.max(160, 82 + visibleRows * (properties.showTriggerWords === false ? 88 : 120) + (children.length - visibleRows) * 30));
+    this.element.style.height = `${this.height}px`;
+  }
+  createRow(row) {
+    const root = element("section", "nd-lora-row");
+    const top = element("div", "nd-lora-row-top");
+    const enabled = element("input");
+    enabled.type = "checkbox";
+    enabled.setAttribute("aria-label", "Enable LoRA");
+    enabled.addEventListener("change", () => this.actions.change(row, { enabled: enabled.checked }));
+    const choose = button("", "Choose LoRA file", (event) => this.actions.choose(row, event));
+    choose.className = "nd-lora-name";
+    const up = button("↑", "Move LoRA up", () => this.actions.move(row, -1));
+    const down = button("↓", "Move LoRA down", () => this.actions.move(row, 1));
+    const remove = button("×", "Remove LoRA", () => this.actions.remove(row));
+    top.append(enabled, choose, up, down, remove);
+    const controls = element("div", "nd-lora-controls");
+    const strength = (name, key) => {
+      const label = element("label", "nd-lora-strength");
+      const text = element("span");
+      text.textContent = name;
+      const input = element("input");
+      input.type = "number";
+      input.min = "-20";
+      input.max = "20";
+      input.step = "0.05";
+      input.setAttribute("aria-label", `${name} strength`);
+      input.addEventListener("input", () => {
+        if (!Number.isFinite(input.valueAsNumber)) return;
+        const value = Math.max(-20, Math.min(20, input.valueAsNumber));
+        const patch = { [key]: value };
+        if (key === "strength" && !this.node.properties.showSeparateStrengths) patch.strengthClip = value;
+        this.actions.change(row, patch);
+      });
+      input.addEventListener("change", () => {
+        input.value = String(row.value[key] ?? row.value.strength ?? 1);
+      });
+      label.append(text, input);
+      return { label, input };
+    };
+    const model = strength("Model", "strength");
+    const clip = strength("CLIP", "strengthClip");
+    const tag = button("", "Choose LoRA tag", () => this.actions.tag(row));
+    tag.className = "nd-lora-tag";
+    controls.append(model.label, clip.label, tag);
+    const triggers = element("div", "nd-lora-triggers");
+    const words = element("input");
+    words.type = "text";
+    words.placeholder = "Trigger words";
+    words.setAttribute("aria-label", "Trigger words");
+    words.addEventListener("input", () => this.actions.change(row, { triggerWords: words.value, autoFetched: false, fetchAttempted: false }));
+    const refresh = button("↻", "Refresh trigger words", async (event) => {
+      refresh.disabled = true;
+      try {
+        await this.actions.refresh(row, event);
+      } finally {
+        refresh.disabled = false;
+        this.update();
+      }
+    });
+    triggers.append(words, refresh);
+    root.append(top, controls, triggers);
+    return { root, update: (properties) => {
+      const value = row.value;
+      enabled.checked = !!value.enabled;
+      root.classList.toggle("nd-lora-disabled", !value.enabled);
+      choose.textContent = value.lora === "None" ? "Choose LoRA…" : String(value.lora);
+      choose.title = String(value.lora);
+      tag.textContent = value.tag || "General";
+      tag.hidden = !properties.enableTags || properties.showTagChip === false;
+      up.hidden = down.hidden = properties.showMoveArrows === false;
+      remove.hidden = properties.showRemoveButton === false;
+      controls.hidden = properties.showStrengthControls === false;
+      clip.label.hidden = !properties.showSeparateStrengths;
+      triggers.hidden = properties.showTriggerWords === false;
+      for (const [input, next] of [[model.input, value.strength ?? 1], [clip.input, value.strengthClip ?? value.strength ?? 1], [words, value.triggerWords || ""]]) {
+        if (document.activeElement !== input) input.value = String(next);
+      }
+    } };
+  }
+}
+function ensureLoraPanel(node, actions) {
+  if (typeof document === "undefined" || typeof node.addDOMWidget !== "function") return;
+  if (!panels.has(node)) panels.set(node, new SuperLoraPanel(node, actions));
+  panels.get(node)?.update();
+}
 const app = window.app;
 const LiteGraph = window.LiteGraph;
 const _SuperLoraNode = class _SuperLoraNode {
@@ -3451,6 +3651,8 @@ const _SuperLoraNode = class _SuperLoraNode {
     console.log("Super LoRA Loader: Advanced node setup complete");
   }
   static computeContentHeight(node) {
+    const panel = getLoraPanel(node);
+    if (panel) return this.NODE_WIDGET_TOP_OFFSET + panel.height;
     const marginDefault = _SuperLoraNode.MARGIN_SMALL;
     let currentY = this.NODE_WIDGET_TOP_OFFSET;
     if (!node?.customWidgets) {
@@ -3481,6 +3683,7 @@ const _SuperLoraNode = class _SuperLoraNode {
    * Calculate required node size based on widgets
    */
   static calculateNodeSize(node) {
+    getLoraPanel(node)?.update();
     const newHeight = this.computeContentHeight(node);
     if (node.size[1] !== newHeight) {
       node.size[1] = newHeight;
@@ -3490,6 +3693,7 @@ const _SuperLoraNode = class _SuperLoraNode {
    * Custom drawing for all widgets
    */
   static drawCustomWidgets(node, ctx) {
+    if (getLoraPanel(node)) return;
     if (!node.customWidgets) return;
     const isBypassed = _SuperLoraNode.isNodeBypassed(node);
     const marginDefault = _SuperLoraNode.MARGIN_SMALL;
@@ -3543,6 +3747,7 @@ const _SuperLoraNode = class _SuperLoraNode {
     return this.handleMouseEvent(node, event, pos, "onClick");
   }
   static handleMouseEvent(node, event, pos, handler) {
+    if (getLoraPanel(node)) return false;
     if (!node.customWidgets) return false;
     if (_SuperLoraNode.isNodeBypassed(node)) {
       return true;
@@ -3958,6 +4163,9 @@ const _SuperLoraNode = class _SuperLoraNode {
     }
     const loraWidgets = node.customWidgets.filter((w) => w instanceof SuperLoraWidget);
     const headerWidget = node.customWidgets.find((w) => w instanceof SuperLoraHeaderWidget);
+    const existingTags = new Map(
+      node.customWidgets.filter((w) => w instanceof SuperLoraTagWidget).map((w) => [w.tag, w])
+    );
     const tagGroups = {};
     for (const widget of loraWidgets) {
       const tag = widget.value.tag || "General";
@@ -3969,9 +4177,7 @@ const _SuperLoraNode = class _SuperLoraNode {
       (a, b) => a === "General" ? -1 : b === "General" ? 1 : a.localeCompare(b)
     );
     for (const tag of sortedTags) {
-      let tagWidget = node.customWidgets.find(
-        (w) => w instanceof SuperLoraTagWidget && w.tag === tag
-      );
+      let tagWidget = existingTags.get(tag);
       if (!tagWidget) {
         tagWidget = new SuperLoraTagWidget(tag);
       }
@@ -4063,6 +4269,38 @@ const _SuperLoraNode = class _SuperLoraNode {
     bridge.value = this.buildBundle(node);
     bridge.serializeValue = () => _SuperLoraNode.buildBundle(node);
     node.serialize_widgets = true;
+    ensureLoraPanel(node, {
+      rows: () => (node.customWidgets || []).filter((w) => w instanceof SuperLoraWidget),
+      isTag: (w) => w instanceof SuperLoraTagWidget,
+      add: () => {
+        void this.showLoraSelector(node);
+      },
+      save: () => this.showSaveTemplateDialog(node),
+      load: (event) => {
+        void this.showLoadTemplateDialog(node, event);
+      },
+      settings: (event) => this.showSettingsDialog(node, event),
+      choose: (row, event) => {
+        void this.showLoraSelector(node, row, event);
+      },
+      tag: (row) => {
+        void this.showTagSelector(node, row);
+      },
+      remove: (row) => this.removeLoraWidget(node, row),
+      refresh: (row, event) => row.onRefreshClick(event, null, node),
+      move: (row, direction) => {
+        if (direction < 0) row.onMoveUpClick(null, null, node);
+        else row.onMoveDownClick(null, null, node);
+        this.syncExecutionWidgets(node);
+      },
+      change: (row, values) => {
+        Object.assign(row.value, values);
+        if ("triggerWords" in values) TriggerWordStore.set(row.value.lora, String(values.triggerWords));
+        this.syncExecutionWidgets(node);
+      },
+      changed: () => this.syncExecutionWidgets(node)
+    });
+    if (getLoraPanel(node)) this.calculateNodeSize(node);
     node.setDirtyCanvas(true, true);
   }
   // Build the JSON bundle the backend expects from current custom widgets
@@ -5239,8 +5477,8 @@ const _NodeEnhancerExtension = class _NodeEnhancerExtension {
     const enabled = this.isExtensionEnabled();
     const targets = [this.SETTINGS.autoEnhanceAll, this.SETTINGS.contextToggle];
     for (const id of targets) {
-      const element = this.findSettingElement(id);
-      this.setSettingDisabled(element, !enabled);
+      const element2 = this.findSettingElement(id);
+      this.setSettingDisabled(element2, !enabled);
     }
   }
   static ensureSettingsStyles() {
@@ -5318,19 +5556,19 @@ const _NodeEnhancerExtension = class _NodeEnhancerExtension {
     }
     return null;
   }
-  static setSettingDisabled(element, disabled) {
-    if (!element) {
+  static setSettingDisabled(element2, disabled) {
+    if (!element2) {
       return;
     }
     const className = "nd-super-nodes-setting-disabled";
     if (disabled) {
-      element.classList.add(className);
-      element.setAttribute("aria-disabled", "true");
+      element2.classList.add(className);
+      element2.setAttribute("aria-disabled", "true");
     } else {
-      element.classList.remove(className);
-      element.removeAttribute("aria-disabled");
+      element2.classList.remove(className);
+      element2.removeAttribute("aria-disabled");
     }
-    const inputs = element.querySelectorAll("input, button, select");
+    const inputs = element2.querySelectorAll("input, button, select");
     inputs.forEach((input) => {
       if (input instanceof HTMLInputElement || input instanceof HTMLButtonElement || input instanceof HTMLSelectElement) {
         input.disabled = disabled;
@@ -5942,6 +6180,17 @@ app$1.registerExtension(nodeEnhancerExtension);
 console.log(`${EXTENSION_NAME$1}: Extension registered successfully`);
 const EXTENSION_NAME = "SuperLoraLoader";
 const NODE_TYPE = "NdSuperLoraLoader";
+if (!document.getElementById("nd-super-nodes-styles")) {
+  const style = document.createElement("link");
+  style.id = "nd-super-nodes-styles";
+  style.rel = "stylesheet";
+  style.href = new URL(
+    /* @vite-ignore */
+    "./style.css",
+    import.meta.url
+  ).href;
+  document.head.appendChild(style);
+}
 const superLoraExtension = {
   name: EXTENSION_NAME,
   // Extension settings

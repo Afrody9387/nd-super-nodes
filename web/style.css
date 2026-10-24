@@ -1,4 +1,131 @@
-@charset "UTF-8";
+@charset "UTF-8";/**
+ * SCSS Variables for Super LoRA Loader
+ */
+.nd-lora-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  overflow: hidden;
+  font: 12px "Segoe UI", sans-serif;
+  color: var(--input-text, #ddd);
+  background: var(--comfy-menu-bg, #242424);
+  border-radius: 6px;
+  pointer-events: auto;
+}
+.nd-lora-panel *, .nd-lora-panel *::before, .nd-lora-panel *::after {
+  box-sizing: border-box;
+}
+.nd-lora-panel [hidden] {
+  display: none !important;
+}
+.nd-lora-panel button, .nd-lora-panel input {
+  min-width: 0;
+  min-height: 26px;
+  border: 1px solid var(--border-color, #555);
+  border-radius: 4px;
+  padding: 3px 6px;
+  color: inherit;
+  background: var(--comfy-input-bg, #303030);
+  font: inherit;
+}
+.nd-lora-panel input {
+  user-select: text;
+}
+.nd-lora-panel input[type=checkbox] {
+  min-height: 16px;
+  flex: 0 0 16px;
+  width: 16px;
+  cursor: pointer;
+}
+.nd-lora-panel input[type=number] {
+  width: 72px;
+}
+.nd-lora-panel button {
+  cursor: pointer;
+}
+.nd-lora-panel button:hover {
+  border-color: var(--p-primary-color, #9e77ed);
+}
+.nd-lora-panel button:focus-visible, .nd-lora-panel input:focus-visible {
+  outline: 2px solid var(--p-primary-color, #9e77ed);
+  outline-offset: 1px;
+}
+.nd-lora-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.nd-lora-panel .nd-lora-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.nd-lora-panel .nd-lora-toolbar button:first-child {
+  background: var(--p-primary-color, #7254bb);
+  color: var(--p-primary-contrast-color, white);
+}
+.nd-lora-panel .nd-lora-list {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nd-lora-panel .nd-lora-row {
+  padding: 6px;
+  border: 1px solid var(--border-color, #555);
+  border-radius: 5px;
+  flex: 0 0 auto;
+}
+.nd-lora-panel .nd-lora-row-top, .nd-lora-panel .nd-lora-controls, .nd-lora-panel .nd-lora-triggers {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+.nd-lora-panel .nd-lora-controls, .nd-lora-panel .nd-lora-triggers {
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+.nd-lora-panel .nd-lora-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.nd-lora-panel .nd-lora-strength {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.nd-lora-panel .nd-lora-tag {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nd-lora-panel .nd-lora-triggers input {
+  flex: 1;
+}
+.nd-lora-panel .nd-lora-group {
+  flex: 0 0 auto;
+  text-align: left;
+}
+.nd-lora-panel .nd-lora-disabled .nd-lora-name {
+  opacity: 0.55;
+}
+.nd-lora-panel .nd-lora-empty {
+  opacity: 0.7;
+  padding: 14px 4px;
+  line-height: 1.5;
+}
 /**
  * SCSS Variables for Super LoRA Loader
  */

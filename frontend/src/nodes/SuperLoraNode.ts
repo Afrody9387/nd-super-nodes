@@ -16,6 +16,9 @@ import { SuperLoraHeaderWidget } from './widgets/SuperLoraHeaderWidget';
 import { SuperLoraTagWidget } from './widgets/SuperLoraTagWidget';
 import { SuperLoraWidget } from './widgets/SuperLoraWidget';
 import { setWidgetAPI } from './widgets/WidgetAPI';
+import { ensureLoraPanel, getLoraPanel } from './SuperLoraPanel';
+import { TriggerWordStore } from '@/services/TriggerWordStore';
+import '../styles/super-lora-panel.scss';
 
 // ComfyUI imports
 const app: any = (window as any).app;
@@ -305,6 +308,8 @@ export class SuperLoraNode {
   }
 
   private static computeContentHeight(node: any): number {
+    const panel = getLoraPanel(node);
+    if (panel) return this.NODE_WIDGET_TOP_OFFSET + panel.height;
     const marginDefault = SuperLoraNode.MARGIN_SMALL;
     let currentY = this.NODE_WIDGET_TOP_OFFSET;
 
@@ -340,6 +345,7 @@ export class SuperLoraNode {
    * Calculate required node size based on widgets
    */
   static calculateNodeSize(node: any): void {
+    getLoraPanel(node)?.update();
     const newHeight = this.computeContentHeight(node);
     // Preserve the user's preferred width - only update height
     if (node.size[1] !== newHeight) {
@@ -351,6 +357,7 @@ export class SuperLoraNode {
    * Custom drawing for all widgets
    */
   static drawCustomWidgets(node: any, ctx: any): void {
+    if (getLoraPanel(node)) return;
     if (!node.customWidgets) return;
     const isBypassed = SuperLoraNode.isNodeBypassed(node);
     const marginDefault = SuperLoraNode.MARGIN_SMALL;
@@ -410,6 +417,7 @@ export class SuperLoraNode {
   }
 
   private static handleMouseEvent(node: any, event: any, pos: any, handler: string): boolean {
+    if (getLoraPanel(node)) return false;
     if (!node.customWidgets) return false;
 
     if (SuperLoraNode.isNodeBypassed(node)) {
@@ -891,6 +899,10 @@ export class SuperLoraNode {
     
     const loraWidgets = node.customWidgets.filter((w: any) => w instanceof SuperLoraWidget);
     const headerWidget = node.customWidgets.find((w: any) => w instanceof SuperLoraHeaderWidget);
+    const existingTags = new Map<string, SuperLoraTagWidget>(
+      node.customWidgets.filter((w: any) => w instanceof SuperLoraTagWidget)
+        .map((w: SuperLoraTagWidget) => [w.tag, w])
+    );
     
     // Group by tags
     const tagGroups: { [key: string]: SuperLoraWidget[] } = {};
@@ -909,9 +921,7 @@ export class SuperLoraNode {
     
     for (const tag of sortedTags) {
       // Find or create tag widget
-      let tagWidget = node.customWidgets.find((w: any) => 
-        w instanceof SuperLoraTagWidget && w.tag === tag
-      );
+      let tagWidget = existingTags.get(tag);
       
       if (!tagWidget) {
         tagWidget = new SuperLoraTagWidget(tag);
@@ -1025,6 +1035,30 @@ export class SuperLoraNode {
     // Read live custom widgets so a queued prompt never uses stale strengths.
     bridge.serializeValue = () => SuperLoraNode.buildBundle(node);
     node.serialize_widgets = true;
+    ensureLoraPanel(node, {
+      rows: () => (node.customWidgets || []).filter((w: any) => w instanceof SuperLoraWidget),
+      isTag: (w: any) => w instanceof SuperLoraTagWidget,
+      add: () => { void this.showLoraSelector(node); },
+      save: () => this.showSaveTemplateDialog(node),
+      load: (event) => { void this.showLoadTemplateDialog(node, event); },
+      settings: (event) => this.showSettingsDialog(node, event),
+      choose: (row, event) => { void this.showLoraSelector(node, row, event); },
+      tag: (row) => { void this.showTagSelector(node, row); },
+      remove: (row) => this.removeLoraWidget(node, row),
+      refresh: (row, event) => row.onRefreshClick(event, null, node),
+      move: (row, direction) => {
+        if (direction < 0) row.onMoveUpClick(null, null, node);
+        else row.onMoveDownClick(null, null, node);
+        this.syncExecutionWidgets(node);
+      },
+      change: (row, values) => {
+        Object.assign(row.value, values);
+        if ('triggerWords' in values) TriggerWordStore.set(row.value.lora, String(values.triggerWords));
+        this.syncExecutionWidgets(node);
+      },
+      changed: () => this.syncExecutionWidgets(node),
+    });
+    if (getLoraPanel(node)) this.calculateNodeSize(node);
     node.setDirtyCanvas(true, true);
   }
 

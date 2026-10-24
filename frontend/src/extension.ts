@@ -16,6 +16,15 @@ import { UpdateService } from './services/UpdateService';
 const EXTENSION_NAME = 'SuperLoraLoader';
 const NODE_TYPE = 'NdSuperLoraLoader';
 
+// Vite emits CSS separately; ComfyUI's extension loader imports JavaScript only.
+if (!document.getElementById('nd-super-nodes-styles')) {
+  const style = document.createElement('link');
+  style.id = 'nd-super-nodes-styles';
+  style.rel = 'stylesheet';
+  style.href = new URL(/* @vite-ignore */ './style.css', import.meta.url).href;
+  document.head.appendChild(style);
+}
+
 // Main extension object
 const superLoraExtension: ComfyExtension = {
   name: EXTENSION_NAME,

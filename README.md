@@ -5,6 +5,8 @@
 This fork of [HenkDz/nd-super-nodes](https://github.com/HenkDz/nd-super-nodes)
 fixes missing LoRA execution parameters and workflow persistence on ComfyUI
 frontend 1.53.6. See [release notes](FORK_RELEASE_NOTES.md) for validation and limits.
+Since 1.9.0, the loader uses native DOM controls in both modern Nodes 2.0 and
+classic Canvas mode, including the LoRA list, dual strengths, tags and templates.
 Source and compiled runtime files are both included. Update checks and updater
 downloads use this fork's GitHub releases. The original MIT license is retained.
 
@@ -24,6 +26,12 @@ Comfy Registry project.
 Serialization regression check (reads the installed frontend's actual code):
 `node tests/verify_frontend_serialization.cjs --frontend-assets /path/to/comfyui_frontend_package/static/assets`.
 Use a checkout with upstream commit `83dba34` available for the before/after comparison.
+
+Browser integration check: install Playwright separately, then run
+`node tests/verify_nodes20_browser.cjs --frontend-root /path/to/comfyui_frontend_package/static --browser /path/to/chrome --screenshots /tmp/nd-super-qa`.
+Set `PLAYWRIGHT_MODULE` to an external Playwright package path if it is not on
+Node's module search path. This serves the real frontend with isolated API
+fixtures and never submits a generation or edits user workflows.
 
 A suite of modern, easy-to-use custom nodes for ComfyUI, including enhanced LoRA loading and powerful UI enhancements for file selection.
 

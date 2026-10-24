@@ -11,6 +11,7 @@ const assets = path.resolve(process.argv[assetsArg + 1]);
 const coreFile = fs.readdirSync(assets).find(f => f.startsWith('settingStore-') && f.endsWith('.js') &&
   fs.readFileSync(path.join(assets, f), 'utf8').includes('serializeFromStoreState(e){let t={id:serializeNodeId'));
 const core = fs.readFileSync(path.join(assets, coreFile), 'utf8');
+const dtoAlias = core.match(/([\w$]+)=class ExecutableNodeDTO/)[1];
 function between(s, start, end) {
   const a = s.indexOf(start);
   assert(a >= 0, start);
@@ -38,6 +39,8 @@ function environment(plugin) {
     SuperLoraHeaderWidget, SuperLoraTagWidget, SuperLoraWidget,
     LoraService: { getInstance() { return {}; } },
     TemplateService: { getInstance() { return {}; } },
+    ensureLoraPanel() {},
+    getLoraPanel() { return undefined; },
     LiteGraph: { NEVER: 2, BYPASS: 4 },
     Rr: { NEVER: 2, BYPASS: 4 },
     Z: { cloneObject: v => JSON.parse(JSON.stringify(v)) },
@@ -56,10 +59,15 @@ function environment(plugin) {
   const pluginClass = between(plugin, 'const _SuperLoraNode = class', 'let SuperLoraNode = _SuperLoraNode;');
   vm.runInContext(pluginClass + '\nglobalThis.Loader = _SuperLoraNode;', ctx);
   const base = between(core, 'serializeFromStoreState(e){let t={id:serializeNodeId', 'clone(){');
+  const storedNodes = between(core, 'function serialiseStoredNodes(', 'function serialiseStoredGroups(');
+  const prompt = between(core, 'var graphToPrompt=async', ';function scanMissingNodes');
+  ctx[base.match(/runExtensionSerializeHook\(this,t,([\w$]+),/)[1]] = new Set();
+  ctx[storedNodes.match(/r=([\w$]+)\(\).getGraphNodesFor/)[1]] = () => ({ getGraphNodesFor: () => ctx.graph._nodes.map(n => n._state) });
+  ctx[prompt.match(/mode!==([\w$]+)\.NEVER/)[1]] = { NEVER: 2, BYPASS: 4 };
   vm.runInContext('globalThis.baseSerialize = ({' + base + '}).serializeFromStoreState;', ctx);
-  vm.runInContext(between(core, 'function serialiseStoredNodes(', 'function serialiseStoredGroups('), ctx);
-  vm.runInContext(between(core, 'zl=class ExecutableNodeDTO', ';function createPromotedWidgetStoreProjection') + ';', ctx);
-  vm.runInContext(between(core, 'var graphToPrompt=async', ';function scanMissingNodes') + ';globalThis.makePrompt = graphToPrompt;', ctx);
+  vm.runInContext(storedNodes, ctx);
+  vm.runInContext(between(core, dtoAlias + '=class ExecutableNodeDTO', ';function createPromotedWidgetStoreProjection') + ';', ctx);
+  vm.runInContext(prompt + ';globalThis.makePrompt = graphToPrompt;', ctx);
   class Node {
     constructor() {
       this.id = '17'; this.type = this.comfyClass = 'NdSuperLoraLoader';
@@ -85,6 +93,8 @@ function environment(plugin) {
     }
   }
   ctx.LGraphNode = Node;
+  const baseAlias = storedNodes.match(/e\.serialize===([\w$]+)\.prototype\.serialize/);
+  if (baseAlias) ctx[baseAlias[1]] = { prototype: { serialize: Node.prototype.serialize } };
   ctx.Loader.setup(Node, {});
   const node = new Node();
   const graph = { id: 'test-graph', _nodes: [node], computeExecutionOrder() { return this._nodes; },
@@ -101,9 +111,13 @@ async function main() {
   const original = environment(originalBundle);
   original.addRow({ lora: 'example.safetensors', enabled: true, strength: 0.8, strengthClip: 0.3 });
   const before = await original.ctx.makePrompt(original.graph);
-  assert.equal(before.output['17'].inputs.lora_bundle, undefined);
-  assert.equal(before.workflow.nodes[0].customWidgets, undefined);
-  console.log('Reproduced original bug: installed frontend omits LoRA bundle and saved custom widgets.');
+  if (!core.includes('.serialize===') || before.output['17'].inputs.lora_bundle === undefined) {
+    assert.equal(before.output['17'].inputs.lora_bundle, undefined);
+    assert.equal(before.workflow.nodes[0].customWidgets, undefined);
+    console.log('Reproduced original bug: frontend omits LoRA bundle and saved custom widgets.');
+  } else {
+    console.log('Baseline: this newer frontend already honors legacy serialization overrides.');
+  }
 
   const env = environment(fs.readFileSync(path.join(root, 'web/extension.js'), 'utf8'));
   const row = env.addRow({ lora: 'folder\\example.safetensors', enabled: true, strength: 0.8, strengthClip: 0.3, triggerWords: 'test', tag: 'General' });
