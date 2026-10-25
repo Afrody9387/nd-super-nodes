@@ -232,6 +232,51 @@ async function main() {
     await panel.getByLabel('Enable LoRA', { exact: true }).first().uncheck();
     await panel.getByLabel('Toggle LoRA details', { exact: true }).nth(1).click();
     await panel.screenshot({ path: path.join(screenshots, 'compact-preview.png') });
+    // Move complete categories, including collapsed ones, without changing
+    // membership, internal row order or the user's collapse preferences.
+    await page.evaluate(() => {
+      const rows = window.qaNode.customWidgets.filter(row => row.value && 'lora' in row.value);
+      rows.forEach((row, i) => { row.value.tag = ['General', 'Portrait', 'Style'][i % 3]; });
+      window.SuperLoraNode.organizeByTags(window.qaNode);
+      window.SuperLoraNode.syncExecutionWidgets(window.qaNode);
+    });
+    const tagOrder = () => page.evaluate(() => window.qaNode.customWidgets.filter(w => w.value && 'collapsed' in w.value).map(w => w.value.tag));
+    const beforeGroups = await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue()));
+    for (const modern of [false, true]) {
+      await page.evaluate(async modern => { await window.app.ui.settings.setSettingValue('Comfy.VueNodes.Enabled', modern); window.app.canvas.setDirty(true, true); }, modern);
+      await page.waitForFunction(modern => window.LiteGraph.vueNodesMode === modern, modern);
+      await page.evaluate(() => {
+        for (const w of window.qaNode.customWidgets) if (w.value && 'collapsed' in w.value) w.value.collapsed = true;
+        window.SuperLoraNode.syncExecutionWidgets(window.qaNode);
+      });
+      await panel.locator('.nd-lora-list').evaluate(el => { el.scrollTop = 0; });
+      const original = await tagOrder();
+      const grip = await panel.getByLabel('Drag to reorder category', { exact: true }).last().boundingBox();
+      const target = await panel.locator('.nd-lora-group').first().boundingBox();
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(target.x + target.width / 2, target.y + 2, { steps: 10 });
+      await page.mouse.up();
+      assert.deepEqual(await tagOrder(), [original[2], original[0], original[1]]);
+      assert.equal(await panel.locator('.nd-lora-row').count(), 0, 'drag must keep categories collapsed');
+      await panel.getByLabel('Collapse LoRA tag', { exact: true }).first().click();
+      assert.equal(await panel.locator('.nd-lora-row').count(), 10, 'collapse toggle must still work separately from grip');
+      await panel.getByLabel('Drag to reorder category', { exact: true }).first().press('ArrowDown');
+      const savedOrder = await tagOrder();
+      await page.evaluate(async () => {
+        const saved = window.app.graph.serialize();
+        await window.app.loadGraphData(saved);
+        window.qaNode = window.app.graph._nodes.find(node => node.type === 'NdSuperLoraLoader');
+        window.SuperLoraNode.organizeByTags(window.qaNode);
+        window.SuperLoraNode.syncExecutionWidgets(window.qaNode);
+      });
+      assert.deepEqual(await tagOrder(), savedOrder, 'category order must survive workflow reload and regrouping');
+      const actual = await page.evaluate(() => JSON.parse(window.qaNode.widgets.find(w => w.name === 'lora_bundle').serializeValue()));
+      for (const tag of ['General', 'Portrait', 'Style']) {
+        assert.deepEqual(actual.filter(row => row.tag === tag), beforeGroups.filter(row => row.tag === tag), 'group move must preserve all LoRA values and internal order');
+      }
+    }
+    await panel.screenshot({ path: path.join(screenshots, 'category-order.png') });
     assert.equal(errors.some(error => /SuperLoraPanel|ensureLoraPanel|SuperLoraNode\.syncExecutionWidgets/.test(error)), false);
     console.log('PASS: real Nodes 2.0/classic renderers; compact rows, collapsed triggers, drag reorder, 30-row bounded scrolling, actual grip resizing, edit-preserved height, wheel without graph zoom, focus, strengths, toggles, tags, add/remove, workflow reload and execution serialization.');
     console.log('Isolated fixture console:', JSON.stringify([...new Set(errors.map(error => error.slice(0, 160)))]));

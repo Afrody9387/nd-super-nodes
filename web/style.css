@@ -153,7 +153,13 @@
   flex: 1;
 }
 .nd-lora-panel .nd-lora-group {
+  display: flex;
+  gap: 3px;
   flex: 0 0 auto;
+  text-align: left;
+}
+.nd-lora-panel .nd-lora-group-toggle {
+  flex: 1;
   text-align: left;
 }
 .nd-lora-panel .nd-lora-disabled {

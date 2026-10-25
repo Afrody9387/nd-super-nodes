@@ -3324,17 +3324,32 @@ class SuperLoraPanel {
       if (this.actions.isTag(item) && properties.enableTags) {
         let header = this.tagViews.get(item);
         if (!header) {
-          header = button("", "Collapse LoRA tag", () => {
+          const toggle = button("", "Collapse LoRA tag", () => {
             item.value.collapsed = !item.value.collapsed;
             this.actions.changed();
           });
-          header.className = "nd-lora-group";
+          const root = element("div", "nd-lora-group");
+          toggle.className = "nd-lora-group-toggle";
+          const grip = button("⠿", "Drag to reorder category", () => {
+          });
+          grip.className = "nd-lora-drag";
+          grip.addEventListener("pointerdown", (event) => this.startDrag(event, item, root, grip, true));
+          grip.addEventListener("keydown", (event) => {
+            if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+            event.preventDefault();
+            const tags = this.node.customWidgets.filter((widget) => this.actions.isTag(widget));
+            const target = tags[tags.indexOf(item) + (event.key === "ArrowUp" ? -1 : 1)];
+            if (target) this.actions.reorderTag(item, target, event.key === "ArrowDown");
+          });
+          root.append(toggle, grip);
+          this.rowsByElement.set(root, item);
+          header = { root, toggle };
           this.tagViews.set(item, header);
         }
         collapsed = !!item.value.collapsed;
-        header.textContent = `${collapsed ? "▸" : "▾"} ${item.value.tag} (${rows.filter((row) => row.value.tag === item.value.tag).length})`;
-        header.setAttribute("aria-expanded", String(!collapsed));
-        children.push(header);
+        header.toggle.textContent = `${collapsed ? "▸" : "▾"} ${item.value.tag} (${rows.filter((row) => row.value.tag === item.value.tag).length})`;
+        header.toggle.setAttribute("aria-expanded", String(!collapsed));
+        children.push(header.root);
       } else if (rows.includes(item) && !collapsed) {
         let view = this.rowViews.get(item);
         if (!view) {
@@ -3447,7 +3462,7 @@ class SuperLoraPanel {
       }
     } };
   }
-  startDrag(event, row, root, handle) {
+  startDrag(event, row, root, handle, group = false) {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -3464,7 +3479,12 @@ class SuperLoraPanel {
       marker?.classList.remove("nd-lora-drop-before", "nd-lora-drop-after");
       marker = void 0;
       target = void 0;
-      const candidate = document.elementFromPoint(x, y)?.closest(".nd-lora-row");
+      let candidate = document.elementFromPoint(x, y)?.closest(group ? ".nd-lora-group, .nd-lora-row" : ".nd-lora-row");
+      if (group && candidate?.matches(".nd-lora-row")) {
+        const tag = this.rowsByElement.get(candidate)?.value.tag || "General";
+        const widget = this.node.customWidgets.find((item) => this.actions.isTag(item) && item.value.tag === tag);
+        candidate = widget ? this.tagViews.get(widget)?.root : void 0;
+      }
       if (!candidate || candidate === root || !this.list.contains(candidate)) return;
       target = this.rowsByElement.get(candidate);
       if (!target) return;
@@ -3503,7 +3523,10 @@ class SuperLoraPanel {
       if (e.pointerId !== event.pointerId) return;
       const selected = target;
       cleanup();
-      if (selected) this.actions.reorder(row, selected, after);
+      if (selected) {
+        if (group) this.actions.reorderTag(row, selected, after);
+        else this.actions.reorder(row, selected, after);
+      }
     };
     const cancel = (e) => {
       if (e.pointerId === event.pointerId) cleanup();
@@ -4266,16 +4289,18 @@ const _SuperLoraNode = class _SuperLoraNode {
     const existingTags = new Map(
       node.customWidgets.filter((w) => w instanceof SuperLoraTagWidget).map((w) => [w.tag, w])
     );
-    const tagGroups = {};
+    const tagGroups = /* @__PURE__ */ Object.create(null);
     for (const widget of loraWidgets) {
       const tag = widget.value.tag || "General";
       if (!tagGroups[tag]) tagGroups[tag] = [];
       tagGroups[tag].push(widget);
     }
     node.customWidgets = [headerWidget].filter(Boolean);
-    const sortedTags = Object.keys(tagGroups).sort(
+    const defaultTags = Object.keys(tagGroups).sort(
       (a, b) => a === "General" ? -1 : b === "General" ? 1 : a.localeCompare(b)
     );
+    const preferred = Array.isArray(node.properties.tagOrder) ? node.properties.tagOrder.filter((tag) => typeof tag === "string") : [];
+    const sortedTags = [.../* @__PURE__ */ new Set([...preferred, ...defaultTags])].filter((tag) => tagGroups[tag]);
     for (const tag of sortedTags) {
       let tagWidget = existingTags.get(tag);
       if (!tagWidget) {
@@ -4391,6 +4416,17 @@ const _SuperLoraNode = class _SuperLoraNode {
       move: (row, direction) => {
         if (direction < 0) row.onMoveUpClick(null, null, node);
         else row.onMoveDownClick(null, null, node);
+        this.syncExecutionWidgets(node);
+      },
+      reorderTag: (tag, target, after) => {
+        if (tag === target) return;
+        const tags = node.customWidgets.filter((widget) => widget instanceof SuperLoraTagWidget);
+        const from = tags.indexOf(tag);
+        if (from < 0 || !tags.includes(target)) return;
+        tags.splice(from, 1);
+        tags.splice(tags.indexOf(target) + (after ? 1 : 0), 0, tag);
+        node.properties.tagOrder = tags.map((widget) => widget.value.tag);
+        this.organizeByTags(node);
         this.syncExecutionWidgets(node);
       },
       reorder: (row, target, after) => {

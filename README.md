@@ -33,6 +33,7 @@ This is an independently maintained fork of **[HenkDz/nd-super-nodes](https://gi
 | **Details on demand** | The rightmost triangle opens trigger words and the tag button. Details start collapsed, so unused fields take no extra space. |
 | **A list that fits your node** | Both modes scroll inside the node. Resize taller or shorter to choose how many rows you see; edits preserve your chosen height. |
 | **Grab, drag, done** | A single grip replaces up/down arrows. An insertion marker shows the drop position; dragging near the list edge scrolls automatically. |
+| **Arrange whole categories** | Drag the grip on a category header to move the entire group, even when collapsed. Internal LoRA order and collapse state stay intact; workflow saves retain your category order. |
 | **Clear on/off states** | Enabled rows have a theme accent and solid side stripe. Disabled rows use a neutral surface, dashed stripe and dimmed names/strengths. |
 | **Readable expanded details** | A separate surface, divider and indentation distinguish trigger/tag details. The open triangle is highlighted. Colors follow the active theme. |
 | **Modern and classic support** | Native DOM controls work in Nodes 2.0 and classic Canvas. This fork also fixes missing LoRA execution parameters and workflow persistence on affected frontend versions. |
@@ -94,6 +95,7 @@ LoRA 加得多，节点也能保持清楚好用。权重就在名字旁边，启
 | **触发词按需展开** | 点击最右侧三角，才显示触发词和分组按钮；默认收起，减少纵向占位。 |
 | **滚动列表＋自由调整高度** | 经典模式和 Nodes 2.0 都能在节点内部滚动。节点拉高显示更多，缩短也不撑开；修改权重、添加 LoRA 不会重置设定的高度。 |
 | **直接拖动排序** | 一个拖动手柄代替上下箭头。插入标记提示放置位置，拖到列表边缘自动滚动。 |
+| **分类也能拖动排序** | 按住分类标题右侧手柄，移动整个分类，收起时也能拖动。分类内 LoRA 顺序、折叠状态保持，分类顺序随工作流保存。 |
 | **启用、停用一眼分清** | 启用项使用主题色底和左侧实线；停用项使用中性底色、虚线，名字与权重适度变淡。 |
 | **详情有清楚的层次** | 展开区域使用独立底色、分隔线和缩进，三角同步高亮；配色跟随当前主题。 |
 | **兼顾新旧节点设计** | Nodes 2.0 与经典 Canvas 均使用原生 DOM 控件；同时修复受影响前端版本中 LoRA 执行参数缺失、工作流保存恢复的问题。 |

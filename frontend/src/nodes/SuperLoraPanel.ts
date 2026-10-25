@@ -12,6 +12,7 @@ export interface PanelActions {
   refresh(row: any, event: MouseEvent): Promise<unknown>;
   move(row: any, direction: number): void;
   reorder(row: any, target: any, after: boolean): void;
+  reorderTag(tag: any, target: any, after: boolean): void;
   change(row: any, values: Record<string, unknown>): void;
   changed(): void;
 }
@@ -50,7 +51,7 @@ export class SuperLoraPanel {
   readonly widget: any;
   private readonly list = element('div', 'nd-lora-list');
   private readonly rowViews = new WeakMap<object, ReturnType<SuperLoraPanel['createRow']>>();
-  private readonly tagViews = new WeakMap<object, HTMLButtonElement>();
+  private readonly tagViews = new WeakMap<object, { root: HTMLElement; toggle: HTMLButtonElement }>();
   private readonly rowsByElement = new WeakMap<HTMLElement, any>();
   private cancelDrag?: () => void;
   private readonly allButton: HTMLButtonElement;
@@ -127,17 +128,31 @@ export class SuperLoraPanel {
       if (this.actions.isTag(item) && properties.enableTags) {
         let header = this.tagViews.get(item);
         if (!header) {
-          header = button('', 'Collapse LoRA tag', () => {
+          const toggle = button('', 'Collapse LoRA tag', () => {
             item.value.collapsed = !item.value.collapsed;
             this.actions.changed();
           });
-          header.className = 'nd-lora-group';
+          const root = element('div', 'nd-lora-group');
+          toggle.className = 'nd-lora-group-toggle';
+          const grip = button('⠿', 'Drag to reorder category', () => {});
+          grip.className = 'nd-lora-drag';
+          grip.addEventListener('pointerdown', event => this.startDrag(event, item, root, grip, true));
+          grip.addEventListener('keydown', event => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            const tags = this.node.customWidgets.filter((widget: any) => this.actions.isTag(widget));
+            const target = tags[tags.indexOf(item) + (event.key === 'ArrowUp' ? -1 : 1)];
+            if (target) this.actions.reorderTag(item, target, event.key === 'ArrowDown');
+          });
+          root.append(toggle, grip);
+          this.rowsByElement.set(root, item);
+          header = { root, toggle };
           this.tagViews.set(item, header);
         }
         collapsed = !!item.value.collapsed;
-        header.textContent = `${collapsed ? '▸' : '▾'} ${item.value.tag} (${rows.filter(row => row.value.tag === item.value.tag).length})`;
-        header.setAttribute('aria-expanded', String(!collapsed));
-        children.push(header);
+        header.toggle.textContent = `${collapsed ? '▸' : '▾'} ${item.value.tag} (${rows.filter(row => row.value.tag === item.value.tag).length})`;
+        header.toggle.setAttribute('aria-expanded', String(!collapsed));
+        children.push(header.root);
       } else if (rows.includes(item) && !collapsed) {
         let view = this.rowViews.get(item);
         if (!view) { view = this.createRow(item); this.rowViews.set(item, view); }
@@ -237,7 +252,7 @@ export class SuperLoraPanel {
     } };
   }
 
-  private startDrag(event: PointerEvent, row: any, root: HTMLElement, handle: HTMLButtonElement): void {
+  private startDrag(event: PointerEvent, row: any, root: HTMLElement, handle: HTMLButtonElement, group = false): void {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -253,7 +268,12 @@ export class SuperLoraPanel {
     const mark = (x: number, y: number) => {
       marker?.classList.remove('nd-lora-drop-before', 'nd-lora-drop-after');
       marker = undefined; target = undefined;
-      const candidate = document.elementFromPoint(x, y)?.closest<HTMLElement>('.nd-lora-row');
+      let candidate = document.elementFromPoint(x, y)?.closest<HTMLElement>(group ? '.nd-lora-group, .nd-lora-row' : '.nd-lora-row');
+      if (group && candidate?.matches('.nd-lora-row')) {
+        const tag = this.rowsByElement.get(candidate)?.value.tag || 'General';
+        const widget = this.node.customWidgets.find((item: any) => this.actions.isTag(item) && item.value.tag === tag);
+        candidate = widget ? this.tagViews.get(widget)?.root : undefined;
+      }
       if (!candidate || candidate === root || !this.list.contains(candidate)) return;
       target = this.rowsByElement.get(candidate);
       if (!target) return;
@@ -288,7 +308,10 @@ export class SuperLoraPanel {
       if (e.pointerId !== event.pointerId) return;
       const selected = target;
       cleanup();
-      if (selected) this.actions.reorder(row, selected, after);
+      if (selected) {
+        if (group) this.actions.reorderTag(row, selected, after);
+        else this.actions.reorder(row, selected, after);
+      }
     };
     const cancel = (e: PointerEvent) => { if (e.pointerId === event.pointerId) cleanup(); };
     this.cancelDrag = cleanup;

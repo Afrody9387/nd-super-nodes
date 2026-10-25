@@ -67,7 +67,8 @@
   .nd-lora-strength { display: inline-flex; align-items: center; gap: 2px; }
   .nd-lora-tag { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nd-lora-triggers input { flex: 1; }
-  .nd-lora-group { flex: 0 0 auto; text-align: left; }
+  .nd-lora-group { display: flex; gap: 3px; flex: 0 0 auto; text-align: left; }
+  .nd-lora-group-toggle { flex: 1; text-align: left; }
   .nd-lora-disabled {
     background: var(--comfy-menu-bg, #242424);
     border-left-color: var(--border-color, #555);

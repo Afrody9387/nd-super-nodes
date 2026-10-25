@@ -909,7 +909,7 @@ export class SuperLoraNode {
     );
     
     // Group by tags
-    const tagGroups: { [key: string]: SuperLoraWidget[] } = {};
+    const tagGroups: { [key: string]: SuperLoraWidget[] } = Object.create(null);
     for (const widget of loraWidgets) {
       const tag = widget.value.tag || "General";
       if (!tagGroups[tag]) tagGroups[tag] = [];
@@ -919,9 +919,11 @@ export class SuperLoraNode {
     // Rebuild widgets array
     node.customWidgets = [headerWidget].filter(Boolean);
     
-    const sortedTags = Object.keys(tagGroups).sort((a, b) => 
+    const defaultTags = Object.keys(tagGroups).sort((a, b) =>
       a === "General" ? -1 : b === "General" ? 1 : a.localeCompare(b)
     );
+    const preferred = Array.isArray(node.properties.tagOrder) ? node.properties.tagOrder.filter((tag: unknown) => typeof tag === 'string') : [];
+    const sortedTags = [...new Set<string>([...preferred, ...defaultTags])].filter(tag => tagGroups[tag]);
     
     for (const tag of sortedTags) {
       // Find or create tag widget
@@ -1053,6 +1055,17 @@ export class SuperLoraNode {
       move: (row, direction) => {
         if (direction < 0) row.onMoveUpClick(null, null, node);
         else row.onMoveDownClick(null, null, node);
+        this.syncExecutionWidgets(node);
+      },
+      reorderTag: (tag, target, after) => {
+        if (tag === target) return;
+        const tags = node.customWidgets.filter((widget: any) => widget instanceof SuperLoraTagWidget);
+        const from = tags.indexOf(tag);
+        if (from < 0 || !tags.includes(target)) return;
+        tags.splice(from, 1);
+        tags.splice(tags.indexOf(target) + (after ? 1 : 0), 0, tag);
+        node.properties.tagOrder = tags.map((widget: any) => widget.value.tag);
+        this.organizeByTags(node);
         this.syncExecutionWidgets(node);
       },
       reorder: (row, target, after) => {
