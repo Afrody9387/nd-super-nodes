@@ -229,6 +229,8 @@ async function main() {
     await page.mouse.move(shrinkGrip.x, shrinkGrip.y - 250, { steps: 15 }); await page.mouse.up();
     await page.waitForTimeout(150);
     assert((await metrics()).height < beforeShrink.height - 100, 'node must also shrink without expanding to fit all rows');
+    await panel.getByLabel('Enable LoRA', { exact: true }).first().uncheck();
+    await panel.getByLabel('Toggle LoRA details', { exact: true }).nth(1).click();
     await panel.screenshot({ path: path.join(screenshots, 'compact-preview.png') });
     assert.equal(errors.some(error => /SuperLoraPanel|ensureLoraPanel|SuperLoraNode\.syncExecutionWidgets/.test(error)), false);
     console.log('PASS: real Nodes 2.0/classic renderers; compact rows, collapsed triggers, drag reorder, 30-row bounded scrolling, actual grip resizing, edit-preserved height, wheel without graph zoom, focus, strengths, toggles, tags, add/remove, workflow reload and execution serialization.');

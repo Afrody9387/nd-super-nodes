@@ -10,6 +10,9 @@ classic Canvas mode, including the LoRA list, dual strengths, tags and templates
 Since 1.10.0, rows use one line with inline strengths and a drag handle. Trigger
 words expand individually. Both renderers keep the list scrollable and let the
 user resize the node to show more rows without edits resetting its height.
+Since 1.10.1, enabled rows have an accent tint and solid side stripe; disabled
+rows use neutral colors and a dashed stripe. Expanded details have a separate
+surface, divider and indentation. Colors follow the active ComfyUI theme.
 Source and compiled runtime files are both included. Update checks and updater
 downloads use this fork's GitHub releases. The original MIT license is retained.
 

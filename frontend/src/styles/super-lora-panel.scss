@@ -37,10 +37,30 @@
   .nd-lora-toolbar { display: flex; flex-wrap: wrap; gap: 4px; flex: 0 0 auto; }
   .nd-lora-toolbar button:first-child { background: var(--p-primary-color, #7254bb); color: var(--p-primary-contrast-color, white); }
   .nd-lora-list { height: 0; min-height: 0; overflow-y: scroll; overflow-x: hidden; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: var(--border-color, #666) var(--comfy-menu-bg, #242424); overscroll-behavior: contain; flex: 1 1 0; display: flex; flex-direction: column; gap: 3px; }
-  .nd-lora-row { padding: 3px; border: 1px solid var(--border-color, #555); border-radius: 5px; flex: 0 0 auto; }
+  .nd-lora-row {
+    padding: 3px;
+    border: 1px solid var(--border-color, #555);
+    border-left: 3px solid var(--p-primary-color, #9e77ed);
+    border-radius: 5px;
+    flex: 0 0 auto;
+    background: color-mix(in srgb, var(--p-primary-color, #9e77ed) 14%, var(--comfy-menu-bg, #242424));
+  }
+  .nd-lora-row-top > input[type='checkbox'] { accent-color: var(--p-primary-color, #9e77ed); }
   .nd-lora-row-top, .nd-lora-controls, .nd-lora-triggers { display: flex; gap: 4px; align-items: center; min-width: 0; }
   .nd-lora-controls { flex: 0 0 auto; gap: 3px; }
-  .nd-lora-triggers { margin-top: 4px; }
+  .nd-lora-triggers {
+    margin-top: 4px;
+    padding: 7px 5px 5px 12px;
+    border-top: 1px solid var(--border-color, #555);
+    border-radius: 0 0 3px 3px;
+    background: var(--comfy-input-bg, #303030);
+    box-shadow: inset 3px 0 0 var(--border-color, #555);
+  }
+  .nd-lora-triggers input { background: var(--comfy-menu-bg, #242424); }
+  .nd-lora-expand[aria-expanded='true'] {
+    color: var(--p-primary-contrast-color, white);
+    background: var(--p-primary-color, #7254bb);
+  }
   .nd-lora-row-top { flex-wrap: nowrap; }
   .nd-lora-row-top > button:not(.nd-lora-name), .nd-lora-expand { flex: 0 0 auto; padding: 2px 4px; min-width: 22px; }
   .nd-lora-name { flex: 1 1 0; min-width: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
@@ -48,7 +68,12 @@
   .nd-lora-tag { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nd-lora-triggers input { flex: 1; }
   .nd-lora-group { flex: 0 0 auto; text-align: left; }
-  .nd-lora-disabled .nd-lora-name { opacity: .55; }
+  .nd-lora-disabled {
+    background: var(--comfy-menu-bg, #242424);
+    border-left-color: var(--border-color, #555);
+    border-left-style: dashed;
+  }
+  .nd-lora-disabled .nd-lora-name, .nd-lora-disabled .nd-lora-strength { opacity: .6; }
   .nd-lora-drag { cursor: grab; touch-action: none; }
   .nd-lora-drag:active { cursor: grabbing; }
   .nd-lora-dragging { opacity: .5; }
